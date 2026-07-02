@@ -1,0 +1,244 @@
+table posts {
+  id bigint [pk, increment, not null]
+  uid varchar(50) [not null, unique]
+  status varchar(20) [not null, default: 'active', note: 'deleted']
+  htmlSource longtext [not null]
+  markdownSource longtext [not null]
+  hashtags varchar(512) [null]
+  mentions varchar(512) [null]
+  createdAt bigint(20) [not null]
+  updatedAt bigint(20) [not null]
+  userId bigint(20) [ref: > users.id, not null]
+  attributes json [not null]
+}
+
+table mentions {
+  id bigint [pk, increment, not null]
+  createdAt bigint(20) [not null]
+  updatedAt bigint(20) [not null]
+  userId bigint(20) [ref: > users.id, not null]
+  parentType varchar(127) [not null, default: 'post', note: 'post, post_comment, insight, insight_comment, insight_brick']
+  parentId bigin(20) [not null, note: 'FK for parent type definition']
+  globalMentionId bigint(20) [not null, ref: > global_mentions.id]
+}
+
+table global_mentions {
+  id bigint [pk, increment, not null]
+  uid varchar(50) [not null, unique]
+  createdAt bigint(20) [not null]
+  updatedAt bigint(20) [not null]
+  status varchar(16) [not null, default: 'active', note: 'active | inactive']
+  parentType varchar(32) [not null, default: 'user', note: 'user | team | customer']
+  parentId bigint(20) [not null , note: 'FK for parent type definition']
+  mention varchar(24) [not null]
+  displayName varchar(24) [not null]
+}
+
+table posts_comments {
+  id bigint [pk, increment, not null]
+  uid varchar(50) [not null, unique]
+  status varchar(20) [not null, default: 'active', note: 'active | inactive | deleted']
+  createdAt bigint(20) [not null]
+  updatedAt bigint(20) [not null]
+  markdownSource longtext [not null]
+  htmlSource longtext [not null]
+  hashtags varchar(512) [null]
+  mentions varchar(512) [null]
+  parentId bigint(20) [ref: > posts.id]
+  userId bigint(20) [ref: > users.id, not null]
+}
+
+table posts_insights {
+  id bigint [pk, increment, not null]
+  uid varchar(50) [not null, unique]
+  status varchar(20) [not null, default: 'pending', note: 'pending | done | reported | none']
+  createdAt bigint(20) [not null]
+  updatedAt bigint(20) [not null]
+  markdownSource longtext [not null]
+  htmlSource longtext [not null]
+  hashtags varchar(512) [null]
+  mentions varchar(512) [null]
+  parentId bigint(20) [ref: > posts.id]
+  userId bigint(20) [ref: > users.id, not null]
+  votes bigint(20) [not null, default: '0']
+}
+
+table insights_comments {
+  id bigint [pk, increment, not null]
+  uid varchar(50) [not null, unique]
+  status varchar(20) [not null, default: 'active', note: 'active | deleted']
+  createdAt bigint(20) [not null]
+  updatedAt bigint(20) [not null]
+  markdownSource longtext [not null]
+  htmlSource longtext [not null]
+  hashtags varchar(512) [null]
+  mentions varchar(512) [null]
+  parentId bigint(20) [ref: > posts_insights.id]
+  userId bigint(20) [ref: > users.id, not null]
+}
+
+table insights_bricks {
+  id bigint [pk, increment, not null]
+  uid varchar(50) [unique, not null]
+  parentId bigint(20) [ref: > posts_insights.id]
+  category varchar(63) [not null]
+  createdAt bigint(20) [not null]
+  updatedAt bigint(20) [not null]
+  attributes json [not null]
+  status varchar(20) [not null, default: 'pending', note: 'pending | done | reported | none']
+  userId bigint(20) [ref: > users.id, not null]
+}
+
+table tags {
+  id bigint [pk, increment, not null]
+  name varchar(100) [not null, unique]
+  category varchar(20) [not null, default: 'mention', note: 'mention, hashtag']
+  link varchar(512) [not null]
+  usageCount bigint(20) [not null, default: '1']
+  userId bigint(20) [ref: > users.id, not null]
+}
+
+table taggables {
+  id bigint [pk, increment, not null]
+  uid varchar(50) [unique, not null]
+  createdAt bigint(20) [not null]
+  updatedAt bigint(20) [not null]
+  tagId bigint [ref: > tags.id]
+  parentType varchar(127) [not null, default: 'post', note: 'post, post_comment, insight, insight_comment, insight_brick']
+  parentId bigint(20) [not null]
+  userId bigint(20) [ref: > users.id]
+}
+
+table users {
+  id bigint(20) [pk, not null, increment]
+  uid varchar(50) [unique, not null]
+  status varchar(16) [not null, default: 'pending', note: 'pending | active | inactive']
+  createdAt bigint(20) [not null]
+  updatedAt bigint(20) [not null]
+  password varchar(256) [not null]
+  email varchar(256) [not null]
+  username varchar(128) [not null, unique]
+  attributes json [not null]
+}
+
+table persons {
+  id bigint(20) [pk, increment, not null]
+  createdAt bigint(20) [not null]
+  updatedAt bigint(20) [not null]
+  status varchar(15) [not null, default: 'active']
+  uid varchar(127) [not null, unique]
+  userId bigint(20) [ref: > users.id]
+  name varchar(63) [not null]
+  lastname varchar(63) [null]
+  document varchar(11) [not null]
+  attributes json [not null]
+  personType varchar(8) [not null, default: 'natural', note: 'natural | legal | application']
+  province varchar(63) [not null]
+  locality varchar(63) [not null]
+  attachments json [not null]
+}
+
+table roles {
+  id bigint(20) [pk, not null, increment]
+  name varchar(511) [unique, not null]
+  code varchar(127) [unique, not null] // *, ADMIN, SUDO, 
+  uid varchar(127) [unique, not null]
+  status varchar (16) [not null, default: 'active', note: 'active | inactive']
+  createdAt bigint(20) [not null]
+  updatedAt bigint(20) [not null]
+}
+
+table policies {
+  id bigint(20) [pk, not null, increment]
+  name varchar(127) [unique, not null]
+  code varchar(127) [unique, not null]
+  uid varchar(50) [unique, not null]
+  status varchar (16) [not null, default: 'active', note: 'active | inactive']
+  createdAt bigint(20) [not null]
+  updatedAt bigint(20) [not null]
+  roleId bigint(20) [ref: > roles.id, not null]
+  effect varchar(8) [not null, default: 'allow', note: 'allow | deny']
+}
+
+table actions {
+  id bigint(20) [pk, not null, increment]
+  name varchar(256) [not null]
+  method varchar(127) [unique, not null, default: 'get'] // GET/POST/PUT/PATCH/DELETE
+  policyId bigint(20) [ref: > policies.id, not null]
+  uid varchar(50) [unique, not null]
+  status varchar (16) [not null, default: 'active', note: 'active | inactive']
+  createdAt bigint(20) [not null]
+  updatedAt bigint(20) [not null]
+}
+
+table users_roles {
+  id bigint(20) [pk, not null, increment]
+  userId bigint(20) [ref: > users.id, not null]
+  roleId bigint(20) [ref: > roles.id, not null]
+}
+
+table menus {
+  id bigint(20) [pk, not null, increment]
+  uid varchar(50) [unique, not null]
+  label varchar(63) [not null]
+  path varchar(255) [not null]
+  icon varchar(63) [not null]
+  status varchar(16) [not null, default: 'active', note: 'active | inactive']
+  createdAt bigint(20) [not null]
+  updatedAt bigint(20) [not null]
+  code varchar(23) [not null]
+  order tinyint() [not null]
+}
+
+table roles_menus {
+  id bigint(20) [pk, not null, increment]
+  roleId bigint(20) [ref: > roles.id]
+  menuId bigint(20) [ref: > menus.id]
+}
+
+table parameters {
+  id bigint(20) [pk, increment, not null]
+  name varchar(255) [not null, unique]
+  attributes json [not null]
+  createdAt bigint(20) [not null]
+  updatedAt bigint(20) [not null]
+  status varchar(15) [not null, default: 'active']
+  uid varchar(127) [not null, unique]
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
