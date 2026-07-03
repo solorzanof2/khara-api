@@ -4,6 +4,7 @@ import { InsightComment } from '../../../core/domain/InsightComment';
 import { PostComment } from '../../../core/domain/PostComment';
 import { PostInsight } from '../../../core/domain/PostInsight';
 import { Dates } from '../../../core/helpers/DatesHelper';
+import { LABEL } from '../../../core/helpers/LabelHelper';
 import { SimpleLogger } from '../../../deepcore/application/helpers/SimpleLogger';
 import { ApiEvent, ApiProxyHandler, ApiProxyResult } from '../../../deepcore/application/http/HttpContracts';
 import { ResponseEntity } from '../../../deepcore/application/http/ResponseEntity';
@@ -13,6 +14,7 @@ import { Middlify } from '../../../deepcore/application/middlify/Middlify';
 import { GlobalMentionRepository } from '../../persistence/GlobalMentionRepository';
 import { PostInsightRepository } from '../../persistence/PostInsightRepository';
 import { PostRepository } from '../../persistence/PostRepository';
+import { ProjectRepository } from '../../persistence/ProjectRepository';
 
 
 const ReadPost: ApiProxyHandler = async (event: ApiEvent): Promise<ApiProxyResult> => {
@@ -35,6 +37,14 @@ const ReadPost: ApiProxyHandler = async (event: ApiEvent): Promise<ApiProxyResul
       return ResponseEntity.notFound();
     }
 
+    const projectRepository = new ProjectRepository();
+    const project = await projectRepository.findByIdAndStatusNotDeleted(post.projectId);
+
+    if (!project?.id) {
+      SimpleLogger.warning(`El proyecto de la publicación con el ref: ${ref}, no encontrado.`, 'ReadPostHandler', event.requestId);
+      return ResponseEntity.notFound();
+    }
+
     const postDTO = {
       uid: post.uid,
       rawContent: post.markdownSource,
@@ -43,6 +53,22 @@ const ReadPost: ApiProxyHandler = async (event: ApiEvent): Promise<ApiProxyResul
       createdLabel: Dates.toUserDatetime(post.createdAt),
       updated: post.updatedAt,
       updatedLabel: Dates.toUserDatetime(post.updatedAt),
+      totalComments: post.comments.length,
+      totalInsights: 0,
+      project: {
+        uid: project.uid,
+        workspaceUid: project.workspace?.uid,
+        name: project.name,
+        key: project.projectKey,
+        visibility: project.visibility,
+        visibilityLabel: LABEL.parse(project.visibility),
+        status: project.status,
+        statusLabel: LABEL.parse(project.status),
+        created: project.createdAt,
+        createdLabel: Dates.millisToLocalUserDatetime(project.createdAt),
+        updated: project.updatedAt,
+        updatedLabel: Dates.millisToLocalUserDatetime(project.updatedAt),
+      },
       insights: new Array<any>(),
       comments: new Array<any>(),
       displayName: post.author.displayName,
@@ -64,6 +90,7 @@ const ReadPost: ApiProxyHandler = async (event: ApiEvent): Promise<ApiProxyResul
 
     const insightRepository = new PostInsightRepository();
     const insightsCollection = await insightRepository.findByParentId(post.id);
+    postDTO.totalInsights = insightsCollection.length;
 
     if (insightsCollection?.length) {
       authorsIdsCollection = insightsCollection.map(row => row.authorId);

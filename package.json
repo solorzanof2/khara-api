@@ -5,9 +5,10 @@
   "main": "index.js",
   "scripts": {
     "start": "nodemon src/index.ts",
-    "build": "tsc",
-    "prod": "npm run build && node dist/index.js",
-    "test": "jest"
+    "build": "tsc -p tsconfig.build.json",
+    "prod": "pnpm run build \u0026\u0026 node dist/index.js",
+    "test": "jest",
+    "debug": "nodemon --inspect=9229 src/index.ts"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.2",
@@ -22,6 +23,7 @@
     "@types/node": "^18.15.13",
     "@types/nodemailer": "^6.4.8",
     "@types/request": "^2.48.8",
+    "@types/uuid": "^9.0.8",
     "@types/websocket": "^1.0.5",
     "@types/ws": "^8.5.4",
     "jest": "^29.7.0",
@@ -48,6 +50,7 @@
     "nodemailer": "^6.7.5",
     "redis": "^4.6.5",
     "request": "^2.88.2",
+    "uuid": "^9.0.1",
     "uuidv4": "^6.2.13",
     "websocket": "^1.0.34",
     "ws": "^8.13.0",
@@ -55,5 +58,6 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "packageManager": "pnpm@10.24.0"
 }

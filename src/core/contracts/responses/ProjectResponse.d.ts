@@ -9,6 +9,7 @@ export interface ProjectResponse {
   visibility: string;
   visibilityLabel: string;
   status: string;
+  statusLabel: string;
   created: number;
   createdLabel: string;
   updated: number;

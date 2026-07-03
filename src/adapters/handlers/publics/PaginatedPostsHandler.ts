@@ -1,8 +1,7 @@
 import { PaginationResponse, useTotalPages } from '../../../core/commons/hooks/ListPaginator';
-import { PostResponse } from '../../../core/contracts/responses/PublicResponse';
+import { BasePostResponse } from '../../../core/contracts/responses/PostResponse';
 import { Post } from '../../../core/domain/Post';
 import { Dates } from '../../../core/helpers/DatesHelper';
-import { LABEL } from '../../../core/helpers/LabelHelper';
 import { SimpleLogger } from '../../../deepcore/application/helpers/SimpleLogger';
 import { ApiEvent, ApiProxyHandler, ApiProxyResult } from '../../../deepcore/application/http/HttpContracts';
 import { ResponseEntity } from '../../../deepcore/application/http/ResponseEntity';
@@ -17,26 +16,25 @@ const PaginatedPosts: ApiProxyHandler = async (event: ApiEvent): Promise<ApiProx
     } = event.queryStringParameters;
 
     if (!page || !perPage) {
-      SimpleLogger.warning(`Solicitud de movimientos paginados, sin los parámetros Page ó PerPage definidos, retornando -- 400 Bad Request`, 'PaginatedPostsHandler');
+      SimpleLogger.warning(`Solicitud de posts paginados sin los par�metros Page � PerPage definidos, retornando -- 400 Bad Request`, 'PaginatedPostsHandler');
       return ResponseEntity.badRequest();
     }
 
-    // calculamos la paginación;
     const offset = +page * +perPage;
 
     const postRepository = new PostRepository();
-    const collection = await postRepository.findAllPaginatedByStatusComingOrActive(offset, +perPage);
+    const collection = await postRepository.findAllPaginated(offset, +perPage);
 
     const response = {
       totalRows: await postRepository.count(),
       perPage: +perPage,
       page: +page,
-    } as PaginationResponse<PostResponse>;
+    } as PaginationResponse<BasePostResponse>;
 
     if (!collection?.length) {
-      SimpleLogger.warning(`No se encontraron subastas registradas.`, 'PaginatedPostsHandler');
+      SimpleLogger.warning(`No se encontraron publicaciones registradas.`, 'PaginatedPostsHandler');
 
-      response.collection = new Array<PostResponse>();
+      response.collection = [];
       response.length = 0;
       response.totalPages = 0;
       response.hasPrevious = false;
@@ -45,31 +43,22 @@ const PaginatedPosts: ApiProxyHandler = async (event: ApiEvent): Promise<ApiProx
       return ResponseEntity.ok(response);
     }
 
-    const collector = new Array<PostResponse>();
+    const collector = new Array<BasePostResponse>();
 
     let row: Post;
     for (row of collection) {
-      const [featured] = row
-        .attachments
-        .filter((attachment: any) => attachment.default);
-
       collector.push({
         uid: row.uid,
-        status: row.status,
-        statusLabel: LABEL.parse(row.status),
-        created: row.created,
-        createdLabel: Dates.millisToLocalUserDatetime(row.created),
-        startAt: row.file.startTime,
-        startAtLabel: Dates.millisToLocalUserDatetime(row.file.startTime),
-        endAt: row.file.endTime,
-        endAtLabel: Dates.millisToLocalUserDatetime(row.file.endTime),
-        attachment: featured.guid,
-        title: row.attributes.title,
-        price: row.attributes.amount,
-      });
+        rawContent: row.markdownSource,
+        htmlContent: row.htmlSource,
+        created: row.createdAt,
+        createdLabel: Dates.toUserDatetime(row.createdAt),
+        updated: row.updatedAt,
+        updatedLabel: Dates.toUserDatetime(row.updatedAt),
+        displayName: row.author.displayName,
+        mention: row.author.mention,
+      } as BasePostResponse);
     }
-
-    // armamos la info de paginación;
 
     response.collection = collector;
     response.length = collector.length;
@@ -86,4 +75,3 @@ const PaginatedPosts: ApiProxyHandler = async (event: ApiEvent): Promise<ApiProx
 
 
 export const PaginatedPostsHandler = Middlify(PaginatedPosts, []);
-

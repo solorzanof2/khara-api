@@ -1,4 +1,5 @@
 import { RegularExpression } from '../../../core/commons/constants/RegexConstants';
+import { Dates } from '../../../core/helpers/DatesHelper';
 import { LABEL } from '../../../core/helpers/LabelHelper';
 import { SimpleLogger } from '../../../deepcore/application/helpers/SimpleLogger';
 import { ApiEvent, ApiProxyHandler, ApiProxyResult } from '../../../deepcore/application/http/HttpContracts';
@@ -27,12 +28,20 @@ const VerifyMemberInvitation: ApiProxyHandler = async (event: ApiEvent): Promise
     const invitationRepository = new InvitationRepository();
     const invite = await invitationRepository.findByEmailAndStatusPending(username);
 
+    if (!invite?.id) {
+      SimpleLogger.info(`El usuario no posee invitaciones. Username: ${username}`, 'VerifyMemberInvitationHandler', event.requestId);
+      return ResponseEntity.noContent();
+    }
+
     const response = {
       uid: invite.uid,
       status: invite.status,
       statusLabel: LABEL.parse(invite.status),
-      
+      created: invite.createdAt,
+      createdLabel: Dates.millisToLocalUserDatetime(invite.createdAt),
     }
+
+    return ResponseEntity.ok(response);
   }
   catch (error) {
     return ResponseEntity.error(error);

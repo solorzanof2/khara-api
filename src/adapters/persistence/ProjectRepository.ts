@@ -68,6 +68,27 @@ export class ProjectRepository extends Repository<Project> {
   }
 
 
+  async findByIdAndStatusNotDeleted(value: number): Promise<Project> {
+    try {
+      this.selectQuery
+        .equals('id', `${value}`).and()
+        .notEquals('status', GlobalStatus.Deleted)
+        .limit(1);
+
+      const [row] = await this.execute(this.selectQuery);
+
+      if (!row?.id) {
+        return useResolve(new Project());
+      }
+
+      return useResolve(row);
+    }
+    catch (error) {
+      return useReject(error);
+    }
+  }
+
+
   async findByName(value: string): Promise<Project> {
     try {
       this.selectQuery

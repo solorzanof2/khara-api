@@ -57,7 +57,13 @@ export class CUITHelper {
   }
 
   static format(value: string): string {
-    
+    const normalizedValue = value.replace(/\D/g, '');
+
+    if (normalizedValue.length !== CUITHelper.LENGTH) {
+      return value;
+    }
+
+    return `${normalizedValue.slice(0, 2)}-${normalizedValue.slice(2, 10)}-${normalizedValue.slice(10)}`;
   }
 
 }
