@@ -10,6 +10,7 @@ import { ResponseEntity } from '../../../deepcore/application/http/ResponseEntit
 import { ProvideLoggerMiddleware } from '../../../deepcore/application/middlify/middleware/LoggerMiddleware';
 import { ProvidePolicyMiddleware } from '../../../deepcore/application/middlify/middleware/PolicyMiddleware';
 import { Middlify } from '../../../deepcore/application/middlify/Middlify';
+import { PostInsightRepository } from '../../persistence/PostInsightRepository';
 import { PostRepository } from '../../persistence/PostRepository';
 import { ProjectRepository } from '../../persistence/ProjectRepository';
 
@@ -68,8 +69,14 @@ const ReadPostsCollection: ApiProxyHandler = async (event: ApiEvent): Promise<Ap
     let postDTO: BasePostResponse;
     // let insightDTO: any;
     // let commentDTO: any;
+    let totalInsights: number = 0;
+
+    const insightRepository = new PostInsightRepository();
+    const totalInsightsCollection = await insightRepository.countByParentIdIn(collection.map(post => post.id));
 
     for (post of collection) {
+      totalInsights = totalInsightsCollection.find(insight => insight.parentId === post.id)?.total ?? 0;
+
       postDTO = {
         uid: post.uid,
         rawContent: post.markdownSource,
@@ -79,7 +86,7 @@ const ReadPostsCollection: ApiProxyHandler = async (event: ApiEvent): Promise<Ap
         updated: post.updatedAt,
         updatedLabel: Dates.toUserDatetime(post.updatedAt),
         totalComments: post.comments.length,
-        totalInsights: post.insights.length,
+        totalInsights,
         displayName: post.author.displayName,
         mention: post.author.mention,
       } as BasePostResponse;

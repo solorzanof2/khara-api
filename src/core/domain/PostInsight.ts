@@ -29,3 +29,11 @@ export class PostInsight extends Model {
 
 }
 
+
+export interface InsightCount {
+
+  parentId: number;
+  total: number;
+
+}
+

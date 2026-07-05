@@ -5,6 +5,7 @@ import { CreatePostHandler } from './CreatePostHandler';
 import { CreatePostInsightHandler } from './CreatePostInsightHandler';
 import { ReadPostHandler } from './ReadPostHandler';
 import { ReadPostsCollectionHandler } from './ReadPostsCollectionHandler';
+import { UpdatePostHandler } from './UpdatePostHandler';
 
 
 export const PostRouting: Route[] = [
@@ -37,6 +38,11 @@ export const PostRouting: Route[] = [
     path: '/api/v1/posts/single',
     method: 'get',
     handler: ReadPostHandler,
+  },
+  {
+    path: '/api/v1/posts/update',
+    method: 'post',
+    handler: UpdatePostHandler,
   },
 ];
 

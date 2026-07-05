@@ -1,6 +1,7 @@
 import { GlobalStatus } from '../../core/commons/constants/GlobalConstants';
+import { Partition } from '../../core/commons/constants/Partitions';
 import { InsightComment } from '../../core/domain/InsightComment';
-import { PostInsight } from '../../core/domain/PostInsight';
+import { InsightCount, PostInsight } from '../../core/domain/PostInsight';
 import { jsonParse } from '../../core/helpers/functions/Json';
 import { useReject, useResolve } from '../../core/helpers/functions/Promises';
 import { Repository } from '../../deepcore/infrastructure/persistence/Repository';
@@ -63,6 +64,40 @@ export class PostInsightRepository extends Repository<PostInsight> {
       }
 
       return useResolve(rows);
+    }
+    catch (error) {
+      return useReject(error);
+    }
+  }
+
+  async countByParentIdIn(values: number[]): Promise<InsightCount[]> {
+    try {
+      const questionMarks = values.map(() => '?').join(', ');
+
+      const query = [
+        'SELECT `t0`.parentId, COUNT(`t0`.parentId) as total',
+        'FROM `' + Partition.PostInsight + '` `t0`',
+        'WHERE `t0`.parentId IN (' + questionMarks + ')',
+        'GROUP BY `t0`.parentId',
+      ];
+
+      const rows = await this.queryBySql<InsightCount[]>(query.join(' '), values.map(value => `${value}`));
+
+      if (!rows?.length) {
+        return useResolve(new Array<InsightCount>());
+      }
+
+      const collection = new Array<InsightCount>();
+      let row: any;
+
+      for (row of rows) {
+        collection.push({
+          parentId: row.parentId,
+          total: row.total,
+        });
+      }
+
+      return useResolve(collection);
     }
     catch (error) {
       return useReject(error);
