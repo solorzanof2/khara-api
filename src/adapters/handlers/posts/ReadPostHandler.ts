@@ -41,7 +41,7 @@ const ReadPost: ApiProxyHandler = async (event: ApiEvent): Promise<ApiProxyResul
     const project = await projectRepository.findByIdAndStatusNotDeleted(post.projectId);
 
     if (!project?.id) {
-      SimpleLogger.warning(`El proyecto de la publicación con el ref: ${ref}, no encontrado.`, 'ReadPostHandler', event.requestId);
+      SimpleLogger.warning(`El proyecto de la publicaciÃ³n con el ref: ${ref}, no encontrado.`, 'ReadPostHandler', event.requestId);
       return ResponseEntity.notFound();
     }
 
@@ -120,6 +120,7 @@ const ReadPost: ApiProxyHandler = async (event: ApiEvent): Promise<ApiProxyResul
         updatedLabel: Dates.toUserDatetime(insight.updatedAt),
         displayName: author.displayName,
         mention: author.mention,
+        type: 'insight',
       }
 
       if (insight.comments?.length) {
@@ -160,6 +161,7 @@ const ReadPost: ApiProxyHandler = async (event: ApiEvent): Promise<ApiProxyResul
         updatedLabel: Dates.toUserDatetime(comment.updatedAt),
         displayName: author.displayName,
         mention: author.mention,
+        type: 'comment',
       }
 
       postDTO.comments.push(commentDTO);

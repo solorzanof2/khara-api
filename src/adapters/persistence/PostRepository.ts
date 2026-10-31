@@ -260,5 +260,56 @@ export class PostRepository extends Repository<Post> {
     }
   }
 
+  async findAllPaginatedByUserIdAndStatusActive(value: number, offset: number, limit: number = 10): Promise<Post[]> {
+    try {
+      this.mapAllRelations();
+
+      this.selectQuery
+        .equals('userId', `${value}`).and()
+        .equals('status', GlobalStatus.Active)
+        .paginate(offset, limit)
+        .orderByDesc('id');
+
+      const rows = await this.execute(this.selectQuery);
+
+      if (!rows?.length) {
+        return useResolve(new Array<Post>());
+      }
+
+      let row: Post;
+      for (row of rows) {
+        row.attributes = jsonParse(row.attributes);
+      }
+
+      return useResolve(rows);
+    }
+    catch (error) {
+      return useReject(error);
+    }
+  }
+
+  async countByUserIdAndStatusActive(value: number): Promise<number> {
+    try {
+      const queryBuilder = [
+        "SELECT COUNT(`t0`.id) AS total",
+        "FROM `posts` `t0`",
+        "WHERE `t0`.userId = ?",
+        "AND `t0`.status = ?"
+      ];
+
+      const params = [
+        `${value}`,
+        GlobalStatus.Active,
+      ];
+
+      const total = await super.countByQuery(queryBuilder.join(' '), params);
+
+      return useResolve(total);
+    }
+    catch (error) {
+      return useReject(error);
+    }
+  }
+
 }
 
