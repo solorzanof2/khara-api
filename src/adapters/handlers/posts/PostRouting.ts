@@ -6,10 +6,14 @@ import { CreatePostInsightHandler } from './CreatePostInsightHandler';
 import { ReadPostHandler } from './ReadPostHandler';
 import { ReadPostCollectionByUserHandler } from './ReadPostsCollectionByUserHandler';
 import { ReadPostsCollectionHandler } from './ReadPostsCollectionHandler';
+import { UpdatePostInsightHandler } from './UpdatePostInsightHandler';
+import { UpdatePostCommentHandler } from './UpdatePostCommentHandler';
 import { UpdatePostHandler } from './UpdatePostHandler';
 
 
 export const PostRouting: Route[] = [
+  { path: '/api/v1/posts/insights/update', method: 'post', handler: UpdatePostInsightHandler },
+  { path: '/api/v1/posts/comments/update', method: 'post', handler: UpdatePostCommentHandler },
   {
     path: '/api/v1/posts',
     method: 'post',
