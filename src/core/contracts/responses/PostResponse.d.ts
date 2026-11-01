@@ -14,6 +14,8 @@ export interface PostResponse {
 
 export interface BasePostResponse {
 
+  type?: 'comment' | 'insight';
+
   uid: string;
   rawContent: string;
   htmlContent: string;

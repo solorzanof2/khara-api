@@ -1,19 +1,17 @@
-import MarkdownIt from 'markdown-it';
 import { SimpleLogger } from '../../../deepcore/application/helpers/SimpleLogger';
 import { ApiEvent, ApiProxyHandler, ApiProxyResult } from '../../../deepcore/application/http/HttpContracts';
 import { ResponseEntity } from '../../../deepcore/application/http/ResponseEntity';
 import { PostCommentRepository } from '../../persistence/PostCommentRepository';
-import { PostMapperService } from '../../../core/services/PostMapperService';
-import { GlobalStatus, GlobalTaggableType } from '../../../core/commons/constants/GlobalConstants';
+import { PostReplyService } from '../../../core/services/PostReplyService';
+import { GlobalStatus } from '../../../core/commons/constants/GlobalConstants';
 import { PostComment } from '../../../core/domain/PostComment';
 import { Security } from '../../../deepcore/application/utils/Security';
-import { TaggableService } from '../../../core/services/TaggableService';
 import { Middlify } from '../../../deepcore/application/middlify/Middlify';
 import { ProvideLoggerMiddleware } from '../../../deepcore/application/middlify/middleware/LoggerMiddleware';
 import { PostRepository } from '../../persistence/PostRepository';
 import { WorkspaceRepository } from '../../persistence/WorkspaceRepository';
 import { GlobalMentionRepository } from '../../persistence/GlobalMentionRepository';
-// import { ProjectRepository } from '../../persistence/ProjectRepository';
+import { ProjectRepository } from '../../persistence/ProjectRepository';
 import { jsonString } from '../../../core/helpers/functions/Json';
 import { ProvidePolicyMiddleware } from '../../../deepcore/application/middlify/middleware/PolicyMiddleware';
 import { BasePostResponse } from '../../../core/contracts/responses/PostResponse';
@@ -24,14 +22,13 @@ interface RequestBody {
   content: string;
   parentUid: string;
   workspaceUid: string;
-  // projectUid: string;
 }
 
 
 const CreatePostComment: ApiProxyHandler = async (event: ApiEvent): Promise<ApiProxyResult> => {
   try {
     const {
-      parentUid, content, workspaceUid, /* projectUid, */
+      parentUid, content, workspaceUid,
     } = event.body as RequestBody;
 
     if (!parentUid) {
@@ -39,7 +36,7 @@ const CreatePostComment: ApiProxyHandler = async (event: ApiEvent): Promise<ApiP
       return ResponseEntity.badRequest();
     }
 
-    if (!content) {
+    if (typeof content !== 'string' || !content.trim()) {
       SimpleLogger.warning(`Intento de creación de comentario vacío. [400] Bad Request`, 'CreatePostCommentHandler', event.requestId);
       return ResponseEntity.badRequest();
     }
@@ -48,11 +45,6 @@ const CreatePostComment: ApiProxyHandler = async (event: ApiEvent): Promise<ApiP
       SimpleLogger.warning(`No se recibió un UID válido para WORKSPACE. [400] Bad Request`, 'CreatePostHandler', event.requestId);
       return ResponseEntity.badRequest();
     }
-
-    // if (!projectUid) {
-    //   SimpleLogger.warning(`No se recibió un UID válido para PROJECT. [400] Bad Request`, 'CreatePostHandler', event.requestId);
-    //   return ResponseEntity.badRequest();
-    // }
 
     const workspaceRepository = new WorkspaceRepository();
     const workspace = await workspaceRepository.findByUidAndStatusNotDeleted(workspaceUid);
@@ -70,40 +62,32 @@ const CreatePostComment: ApiProxyHandler = async (event: ApiEvent): Promise<ApiP
       return ResponseEntity.notFound();
     }
 
-    // const projectRepository = new ProjectRepository();
-    // const project = await projectRepository.findByUidAndStatusNotDeleted(projectUid);
-
-    // if (!project?.id) {
-    //   SimpleLogger.warning(`No se encontró el PROJECT con el UID: ${projectUid} | workspace: ${workspaceUid}. [404] Not Found`, 'CreatePostHandler', event.requestId);
-    //   return ResponseEntity.notFound();
-    // }
-
     const postRepository = new PostRepository();
     const parent = await postRepository.findByUid(parentUid);
 
-    if (!parent?.id) {
+    if (!parent?.id || parent.status !== GlobalStatus.Active || parent.workspaceId !== workspace.id) {
       SimpleLogger.warning(`No se encontró la publicación principal con el UID: ${parentUid}. [404] Not Found`, 'CreatePostCommentHandler', event.requestId);
       return ResponseEntity.notFound();
     }
 
-    const now = Date.now();
-    const mdCompiler = MarkdownIt();
-    const postMapperService = new PostMapperService();
+    const project = await new ProjectRepository().findByIdAndStatusNotDeleted(parent.projectId);
+    if (!project?.id || project.workspaceId !== workspace.id) {
+      return ResponseEntity.notFound();
+    }
 
-    let htmlContent = mdCompiler.render(content);
-    const postDataDTO = await postMapperService.parse(htmlContent, event.principalUser.id);
-    postDataDTO.postType = GlobalTaggableType.PostComment;
+    const now = Date.now();
+    const replyService = new PostReplyService();
+    const reply = await replyService.prepare(content, 'comment', project, event.principalUser.id);
 
     let entity = new PostComment();
     entity.uid = Security.getRandomGUID();
     entity.status = GlobalStatus.Active;
-    entity.htmlSource = postDataDTO.post;
-    entity.markdownSource = content;
+    entity.htmlSource = reply.data.post;
+    entity.markdownSource = reply.markdown;
     entity.createdAt = now;
     entity.updatedAt = now;
     entity.attributes = jsonString({});
     entity.workspaceId = workspace.id;
-    // entity.projectId = project.id;
     entity.projectId = parent.projectId;
     entity.authorId = globalMention.id;
     entity.userId = event.principalUser.id;
@@ -113,10 +97,12 @@ const CreatePostComment: ApiProxyHandler = async (event: ApiEvent): Promise<ApiP
     const postCommentRepository = new PostCommentRepository();
     entity = await postCommentRepository.save(entity, true);
 
-    const taggableService = new TaggableService();
-    await taggableService.create(postDataDTO, entity.id);
+    await replyService.createReferences(reply, entity.id);
 
     const commentDTO = {
+      type: 'comment',
+      totalComments: 0,
+      totalInsights: 0,
       uid: entity.uid,
       rawContent: entity.markdownSource,
       htmlContent: entity.htmlSource,
