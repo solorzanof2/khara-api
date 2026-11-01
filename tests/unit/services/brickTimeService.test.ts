@@ -34,3 +34,27 @@ test('rejects unrecognized actions and a finish time before start',()=>{
   expect(()=>BrickTimeService.apply({},'delete',now)).toThrow();
   expect(()=>BrickTimeService.apply(BrickTimeService.apply({},'start',now),'finish',now-1)).toThrow();
 });
+
+
+test('adds a completed interval while retaining an active timer and other attributes', () => {
+  const active = BrickTimeService.apply({ distance: 12 }, 'start', now);
+  const before = JSON.stringify(active);
+  const result = BrickTimeService.apply(active, 'add', now + 1000, undefined, { startedAt: now - 5400000, finishedAt: now });
+  expect(result.time!.measurements[0]).toEqual(active.time!.measurements[0]);
+  expect(result.time!.measurements[1]).toEqual({ startedAt: now - 5400000, finishedAt: now, millis: 5400000, label: '1h 30min', createdAt: now + 1000, reported: false });
+  expect(result.time!.totals).toMatchObject({ millis: 5400000, label: '1h 30min', reported: '0s', createdAt: now });
+  expect(result.distance).toBe(12);
+  expect(JSON.stringify(active)).toBe(before);
+});
+test('adds a first interval and includes it in reported totals only after reporting', () => {
+  const result = BrickTimeService.apply({}, 'add', now, undefined, { startedAt: now - 7200000, finishedAt: now });
+  expect(result.time!.measurements).toHaveLength(1);
+  expect(result.time!.totals).toMatchObject({ millis: 7200000, label: '2h', reported: '0s' });
+  expect(BrickTimeService.apply(result, 'report', now, 0).time!.totals.reported).toBe('2h');
+});
+test.each([undefined, {}, {startedAt: null, finishedAt: now}, {startedAt: '1000', finishedAt: now},
+  {startedAt: now, finishedAt: now}, {startedAt: now, finishedAt: now - 1}, {startedAt: -1, finishedAt: now},
+  {startedAt: NaN, finishedAt: now}, {startedAt: now, finishedAt: Infinity}, {startedAt: 1.5, finishedAt: now},
+  {startedAt: now, finishedAt: 8640000000000001}])('rejects malformed manual interval %p', interval => {
+  expect(() => BrickTimeService.apply({}, 'add', now, undefined, interval as any)).toThrow();
+});

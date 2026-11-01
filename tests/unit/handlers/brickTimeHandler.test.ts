@@ -80,3 +80,24 @@ test('repository compares the original JSON and timestamp and only changes brick
   expect(await repository.saveChanges(entity,{attributes:entity.attributes,updatedAt:100})).toBe(false);
   expect(query).toHaveBeenCalledWith(expect.stringContaining('BINARY CAST(attributes AS CHAR) = BINARY ?'),expect.arrayContaining(['100',entity.attributes]));
 });
+
+
+test('returns and persists calculated manual time, ignoring client totals and reported status', async () => {
+  const response = await UpdateInsightBrickTimeHandler(event('add', { startedAt: now - 5400000, finishedAt: now, millis: 1, label: 'Fake', reported: true }));
+  expect(response.body.status).toBe(200);
+  expect(response.body.payload.attributes.time.measurements[1]).toMatchObject({ startedAt: now - 5400000, finishedAt: now, millis: 5400000, label: '1h 30min', reported: false });
+  expect(response.body.payload.attributes.time.totals).toMatchObject({ millis: 12600000, label: '3h 30min', reported: '2h' });
+  expect(JSON.parse(entity.attributes).time).toEqual(response.body.payload.attributes.time);
+});
+test('invalid manual intervals do not save changes', async () => {
+  expect((await UpdateInsightBrickTimeHandler(event('add', { startedAt: now, finishedAt: now - 1 }))).body.status).toBe(400);
+  expect(InsightBrickRepository.prototype.saveChanges).not.toHaveBeenCalled();
+});
+
+test('keeps the category hashtag when updating the timer', async () => {
+  entity.category = 'MiCategoria';
+  const response = await UpdateInsightBrickTimeHandler(event('start'));
+  expect(response.body.status).toBe(200);
+  expect(entity.category).toBe('MiCategoria');
+  expect(PostReplyService.prototype.prepare).toHaveBeenCalledWith('Original', 'insight-brick', expect.any(Project), 7, '#micategoria · Tiempo: 2h');
+});

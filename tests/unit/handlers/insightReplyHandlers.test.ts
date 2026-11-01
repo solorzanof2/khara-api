@@ -1,4 +1,3 @@
-import { BrickCategoryService } from '../../../src/core/services/BrickCategoryService';
 import { CreateInsightCommentHandler } from '../../../src/adapters/handlers/posts/CreateInsightCommentHandler';
 import { CreateInsightBrickHandler } from '../../../src/adapters/handlers/posts/CreateInsightBrickHandler';
 import { UpdateInsightCommentHandler } from '../../../src/adapters/handlers/posts/UpdateInsightCommentHandler';
@@ -28,7 +27,6 @@ describe.each([
   let child: InsightComment | InsightBrick;
   let parent: PostInsight;
   beforeEach(() => {
-    jest.spyOn(BrickCategoryService.prototype, 'resolve').mockResolvedValue({ id: 1, name: 'General' });
     parent = Object.assign(new PostInsight(), { id: 10, projectId: 20, workspaceId: 30, status: 'active' });
     child = Object.assign(new Entity(), { id: 100, uid: 'child', parentId: 10, projectId: 20, workspaceId: 30,
       userId: 7, authorId: 8, createdAt: 1, status, attributes: '{"keep":true}' });
@@ -63,6 +61,21 @@ describe.each([
     expect(PostInsightRepository.prototype.findByUid).toHaveBeenCalledWith('insight');
     expect(PostReplyService.prototype.replaceReferences).toHaveBeenCalled();
   });
+  if (type === 'insight-brick') {
+    test('creates and edits a custom category only on the brick', async () => {
+      const result = await create(event({ category: ' Soporte propio / QA ' }));
+      expect(result.body.status).toBe(200);
+      expect(repository.prototype.save).toHaveBeenCalledWith(expect.objectContaining({ category: 'Soporte propio / QA' }), true);
+      expect(result.body.payload.category).toBe('Soporte propio / QA');
+      expect((await update(event({ category: 'Otra categoría propia' }))).body.status).toBe(200);
+      expect(child).toMatchObject({ category: 'Otra categoría propia' });
+      expect(InsightBrickRepository.prototype.saveChanges).toHaveBeenCalledWith(expect.objectContaining({ category: 'Otra categoría propia' }), expect.any(Object));
+    });
+    test('rejects categories that exceed the database limit', async () => {
+      expect((await create(event({ category: 'x'.repeat(129) }))).body.status).toBe(400);
+      expect(repository.prototype.save).not.toHaveBeenCalled();
+    });
+  }
   test('rejects edits by another user or for a different parent', async () => {
     child.userId = 999;
     expect((await update(event())).body.status).toBe(403);

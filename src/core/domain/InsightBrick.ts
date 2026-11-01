@@ -9,7 +9,7 @@ export class InsightBrick extends Model {
   parentId: number = 0; // bigint(20) [ref: > posts_insights.id]
   markdownSource: string = '';
   htmlSource: string = '';
-  category: string = ''; // varchar(63) [not null]
+  category: string = ''; // varchar(128) [not null]
   createdAt: number = 0; // bigint(20) [not null]
   updatedAt: number = 0; // bigint(20) [not null]
   attributes: any = ''; // json [not null]

@@ -23,7 +23,7 @@ export class BrickTimeService {
     if (millis > now) throw new Exception('La duración inicial está fuera de rango.', HttpStatus.BadRequest);
     return this.totals([{ startedAt: now - millis, finishedAt: now, millis, label: this.label(millis), createdAt: now, reported }], now);
   }
-  static apply(attributes: BrickAttributes, action: unknown, now: number, measurementIndex?: unknown): BrickAttributes {
+  static apply(attributes: BrickAttributes, action: unknown, now: number, measurementIndex?: unknown, interval?: { startedAt?: unknown; finishedAt?: unknown }): BrickAttributes {
     const measurements = (attributes.time?.measurements || []).map(row => ({ ...row }));
     const active = measurements.find(row => row.finishedAt === null);
     if (action === 'start') {
@@ -34,6 +34,17 @@ export class BrickTimeService {
       if (!active) throw new Exception('El brick no tiene un temporizador en curso.', HttpStatus.Conflict);
       if (now < active.startedAt) throw new Exception('La hora de finalización es inválida.', HttpStatus.Conflict);
       active.finishedAt = now; active.millis = now - active.startedAt; active.label = this.label(active.millis);
+    }
+    else if (action === 'add') {
+      const startedAt = interval?.startedAt;
+      const finishedAt = interval?.finishedAt;
+      if (typeof startedAt !== 'number' || typeof finishedAt !== 'number'
+        || !Number.isSafeInteger(startedAt) || !Number.isSafeInteger(finishedAt)
+        || startedAt < 0 || finishedAt > 8640000000000000 || finishedAt <= startedAt) {
+        throw new Exception('Ingresa fechas válidas; el fin debe ser posterior al inicio.', HttpStatus.BadRequest);
+      }
+      const millis = finishedAt - startedAt;
+      measurements.push({ startedAt, finishedAt, millis, label: this.label(millis), createdAt: now, reported: false });
     }
     else if (action === 'report') {
       if (measurementIndex !== undefined) {

@@ -1,6 +1,5 @@
 import { UpdateInsightBrickTimeHandler } from './UpdateInsightBrickHandler';
 import { ReadBrickCategoriesHandler } from './ReadBrickCategoriesHandler';
-import { CreateBrickCategoryHandler } from './CreateBrickCategoryHandler';
 import { UpdateInsightBrickHandler } from './UpdateInsightBrickHandler';
 import { UpdateInsightCommentHandler } from './UpdateInsightCommentHandler';
 import { CreateInsightBrickHandler } from './CreateInsightBrickHandler';
@@ -22,7 +21,6 @@ import { UpdatePostHandler } from './UpdatePostHandler';
 export const PostRouting: Route[] = [
   { path: '/api/v1/posts/insights/bricks/time', method: 'post', handler: UpdateInsightBrickTimeHandler },
   { path: '/api/v1/posts/insights/bricks/categories', method: 'get', handler: ReadBrickCategoriesHandler },
-  { path: '/api/v1/posts/insights/bricks/categories', method: 'post', handler: CreateBrickCategoryHandler },
   { path: '/api/v1/posts/insights/bricks/update', method: 'post', handler: UpdateInsightBrickHandler },
   { path: '/api/v1/posts/insights/comment/update', method: 'post', handler: UpdateInsightCommentHandler },
   { path: '/api/v1/posts/insights/bricks', method: 'post', handler: CreateInsightBrickHandler },

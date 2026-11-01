@@ -1,6 +1,6 @@
 import { BrickService } from '../../../src/core/services/BrickService';
 import { BrickTimeService } from '../../../src/core/services/BrickTimeService';
-import { BrickCategoryService } from '../../../src/core/services/BrickCategoryService';
+import { BrickCategoryRepository } from '../../../src/adapters/persistence/BrickCategoryRepository';
 import { Project } from '../../../src/core/domain/Project';
 import { InsightBrick } from '../../../src/core/domain/InsightBrick';
 import { GlobalMention } from '../../../src/core/domain/GlobalMention';
@@ -13,7 +13,8 @@ import { Tag } from '../../../src/core/domain/Tag';
 jest.mock('../../../src/deepcore/infrastructure/persistence/MySQLClient', () => ({ MySQLClient: { getInstance: () => ({}) } }));
 const project = Object.assign(new Project(), { id: 20, workspaceId: 30 });
 beforeEach(() => {
-  jest.spyOn(BrickCategoryService.prototype, 'resolve').mockResolvedValue({ id: 2, name: 'Desarrollo' });
+  jest.spyOn(BrickCategoryRepository.prototype, 'findAll').mockRejectedValue(new Error('Brick saves must not access the dictionary'));
+  jest.spyOn(BrickCategoryRepository.prototype, 'save').mockRejectedValue(new Error('Brick saves must not edit the dictionary'));
   jest.spyOn(GlobalMentionRepository.prototype, 'findByParentIdAndParentTypeAndStatusActive').mockResolvedValue(Object.assign(new GlobalMention(), { id: 1, mention: 'proyecto' }));
   jest.spyOn(PostMapperService.prototype, 'parse').mockImplementation(async html => Object.assign(new PostDataDTO(), { post: html, userId: 7 }));
 });
@@ -56,12 +57,42 @@ test('old bricks without measurements stay without invented time', async () => {
   const existing=Object.assign(new InsightBrick(),{category:'General',attributes:'{}'});
   expect((await new BrickService().prepare('Texto',{},project,7,existing)).attributes).toEqual({});
 });
-test('new bricks require a duration', async () => {
-  await expect(new BrickService().prepare('Texto',{},project,7)).rejects.toMatchObject({code:400});
+test('new bricks can be published without any time configuration', async () => {
+  const prepared = await new BrickService().prepare('Texto',{},project,7);
+  expect(prepared.attributes).toEqual({});
+  expect(prepared.reply.markdown).toBe('Texto');
+  expect(prepared.reply.data.post).not.toContain('Tiempo:');
 });
-test('generated category hashtag still uses the existing parser and index', async () => {
+test('custom category is indexed as a hashtag without editing the dictionary', async () => {
   jest.mocked(PostMapperService.prototype.parse).mockRestore();
   jest.spyOn(TagService.prototype,'getByNameAndUpdateUsage').mockImplementation(async(name,userId,category)=>Object.assign(new Tag(),{id:1,name,userId,category,link:'<a>#'+name+'</a>'}));
-  const prepared=await new BrickService().prepare('Texto',{duration:{amount:2,unit:'hours'}},project,7);
-  expect(prepared.reply.data.hashtags).toContain('desarrollo');
+  const prepared=await new BrickService().prepare('Texto',{category:' Categoría propia / soporte ',duration:{amount:2,unit:'hours'}},project,7);
+  expect(prepared.category).toBe('Categoría propia / soporte');
+  expect(prepared.reply.data.hashtags).toContain('categoriapropiasoporte');
+  expect(TagService.prototype.getByNameAndUpdateUsage).toHaveBeenCalledWith('categoriapropiasoporte', 7, 'hashtag');
+  expect(prepared.reply.data.post).not.toContain('Categoría propia');
+  expect(BrickCategoryRepository.prototype.findAll).not.toHaveBeenCalled();
+  expect(BrickCategoryRepository.prototype.save).not.toHaveBeenCalled();
+});
+
+test.each(['MiCategoria', 'x'.repeat(128)])('adds the lowercase category hashtag for %s without changing the saved category', async category => {
+  jest.mocked(PostMapperService.prototype.parse).mockRestore();
+  jest.spyOn(TagService.prototype, 'getByNameAndUpdateUsage').mockImplementation(async (name, userId, type) => Object.assign(new Tag(), { id: 1, name, userId, category: type, link: '<a>#' + name + '</a>' }));
+  const prepared = await new BrickService().prepare('Mi contenido', { category }, project, 7);
+  expect(prepared.category).toBe(category);
+  expect(prepared.reply.markdown).toBe('Mi contenido');
+  expect(prepared.reply.data.hashtags).toContain(category.toLowerCase());
+  expect(prepared.reply.data.post).toContain('#' + category.toLowerCase());
+  expect(BrickCategoryRepository.prototype.save).not.toHaveBeenCalled();
+});
+
+test('replaces generated category metadata on repeated edits and category changes', async () => {
+  const existing = Object.assign(new InsightBrick(), { category: 'Anterior', markdownSource: 'Texto', attributes: '{}' });
+  for (let index = 0; index < 3; index++) {
+    const prepared = await new BrickService().prepare(existing.markdownSource, { category: 'MiCategoria' }, project, 7, existing);
+    expect(prepared.reply.data.post.match(/#micategoria/g)).toHaveLength(1);
+    expect(prepared.reply.data.post).not.toContain('#anterior');
+    existing.markdownSource = prepared.reply.markdown;
+    existing.category = prepared.category;
+  }
 });

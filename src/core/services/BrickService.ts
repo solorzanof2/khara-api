@@ -44,10 +44,10 @@ export class BrickService {
   static durationLabel(millis: number): string { return BrickTimeService.label(millis); }
 
   async render(content: string, category: string, attributes: BrickAttributes, project: Project, userId: number) {
-    const hashtag = BrickCategoryService.normalize(category).hashtag;
-    const footer = '#' + hashtag + (attributes.time ? ' · Tiempo: ' + attributes.time.totals.label : '');
+    const hashtag = BrickCategoryService.hashtag(category);
+    const footer = [hashtag ? '#' + hashtag : '', attributes.time ? 'Tiempo: ' + attributes.time.totals.label : ''].filter(Boolean).join(' · ');
     const reply = await new PostReplyService().prepare(content, 'insight-brick', project, userId, footer);
-    // markdownSource owns the original description. HTML/index references derive from category and time.
+    // Keep the editable description free of generated hashtags and timing metadata.
     return { ...reply, markdown: content };
   }
   async prepare(content: string, input: BrickInput, project: Project, userId: number, existing?: InsightBrick) {
@@ -56,12 +56,12 @@ export class BrickService {
     if (existing && input.duration !== undefined && attributes.time) {
       throw new Exception('Los tiempos registrados se gestionan desde el temporizador del brick.', HttpStatus.BadRequest);
     }
-    if (!existing || input.duration !== undefined) {
+    if (input.duration !== undefined) {
       const duration = BrickService.duration(input.duration);
       attributes.time = BrickTimeService.initial(duration.millis, Date.now(), input.reported ?? false);
     }
     const category = existing && input.category === undefined ? existing.category
-      : (await new BrickCategoryService().resolve(input.category)).name;
+      : BrickCategoryService.normalize(input.category === undefined ? 'General' : input.category);
     const reply = await this.render(content, category || 'General', attributes, project, userId);
     return { reply, category: category || 'General', attributes };
   }

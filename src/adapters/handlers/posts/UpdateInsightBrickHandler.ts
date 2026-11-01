@@ -35,7 +35,7 @@ const updateBrick = (timeAction: boolean): ApiProxyHandler => async event => {
     const previous = { attributes: entity.attributes, updatedAt: entity.updatedAt };
     const service = new BrickService();
     const prepared = timeAction ? await (async () => {
-      const attributes = BrickTimeService.apply(BrickService.attributes(entity.attributes, entity.createdAt), event.body.action, Date.now(), event.body.measurementIndex);
+      const attributes = BrickTimeService.apply(BrickService.attributes(entity.attributes, entity.createdAt), event.body.action, Date.now(), event.body.measurementIndex, { startedAt: event.body.startedAt, finishedAt: event.body.finishedAt });
       return { category: entity.category || 'General', attributes,
         reply: await service.render(BrickService.description(entity), entity.category || 'General', attributes, project, event.principalUser.id) };
     })() : await service.prepare(content, event.body, project, event.principalUser.id, entity);
