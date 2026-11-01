@@ -7,6 +7,8 @@ export class InsightBrick extends Model {
 
   uid: string = ''; // varchar(50) [unique, not null]
   parentId: number = 0; // bigint(20) [ref: > posts_insights.id]
+  markdownSource: string = '';
+  htmlSource: string = '';
   category: string = ''; // varchar(63) [not null]
   createdAt: number = 0; // bigint(20) [not null]
   updatedAt: number = 0; // bigint(20) [not null]

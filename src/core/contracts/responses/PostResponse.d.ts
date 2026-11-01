@@ -1,3 +1,4 @@
+import { BrickAttributes } from '../Brick';
 import { ProjectResponse } from './ProjectResponse';
 
 
@@ -14,7 +15,9 @@ export interface PostResponse {
 
 export interface BasePostResponse {
 
-  type?: 'comment' | 'insight';
+  attributes?: BrickAttributes;
+  category?: string;
+  type?: 'comment' | 'insight' | 'insight-comment' | 'insight-brick';
 
   uid: string;
   rawContent: string;

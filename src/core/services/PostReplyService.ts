@@ -10,14 +10,14 @@ import { PostMapperService } from './PostMapperService';
 import { TaggableService } from './TaggableService';
 
 export class PostReplyService {
-  async prepare(content: string, type: 'comment' | 'insight', project: Project, userId: number) {
+  async prepare(content: string, type: 'comment' | 'insight' | 'insight-comment' | 'insight-brick', project: Project, userId: number, detail?: string) {
     const repository = new GlobalMentionRepository();
     let projectMention = await repository.findByParentIdAndParentTypeAndStatusActive(project.id, GlobalParentType.Project);
     if (!projectMention?.id) {
       projectMention = await new GlobalMentionService().add(project.projectKey, [project.name], project.id, GlobalParentType.Project);
     }
 
-    const metadata = `#${type} @${projectMention.mention}`;
+    const metadata = `#${type === 'insight-comment' ? 'comment' : type === 'insight-brick' ? 'brick' : type} @${projectMention.mention}`;
     const compiler = MarkdownIt();
     const lines = content.replace(/\r\n?/g, '\n').split('\n');
     const removedLines = new Set<number>();
@@ -36,10 +36,12 @@ export class PostReplyService {
     }
     content = lines.filter((_, index) => !removedLines.has(index)).join('\n').replace(/^\n+|\n+$/g, '');
     // Render separately so an unclosed code block cannot swallow the metadata.
-    const html = compiler.render(content) + compiler.render(metadata);
+    const html = compiler.render(content) + (detail ? compiler.render(detail) : '') + compiler.render(metadata);
     const data = await new PostMapperService().parse(html, userId);
-    data.postType = type === 'insight' ? GlobalTaggableType.Insight : GlobalTaggableType.PostComment;
-    return { data, projectMention, markdown: `${content}\n\n${metadata}` };
+    data.postType = type === 'insight' ? GlobalTaggableType.Insight
+      : type === 'insight-comment' ? GlobalTaggableType.InsightComment
+      : type === 'insight-brick' ? GlobalTaggableType.insightBrick : GlobalTaggableType.PostComment;
+    return { data, projectMention, markdown: [content, detail, metadata].filter(Boolean).join('\n\n') };
   }
 
   async replaceReferences(reply: Awaited<ReturnType<PostReplyService['prepare']>>, parentId: number): Promise<void> {

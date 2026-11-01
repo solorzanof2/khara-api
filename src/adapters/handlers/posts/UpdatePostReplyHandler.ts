@@ -8,6 +8,7 @@ import { ProvideLoggerMiddleware } from '../../../deepcore/application/middlify/
 import { ProvidePolicyMiddleware } from '../../../deepcore/application/middlify/middleware/PolicyMiddleware';
 import { Middlify } from '../../../deepcore/application/middlify/Middlify';
 import { GlobalMentionRepository } from '../../persistence/GlobalMentionRepository';
+import { PostInsightRepository } from '../../persistence/PostInsightRepository';
 import { PostRepository } from '../../persistence/PostRepository';
 import { ProjectRepository } from '../../persistence/ProjectRepository';
 import { WorkspaceRepository } from '../../persistence/WorkspaceRepository';
@@ -25,7 +26,7 @@ interface RequestBody {
 }
 
 export function createUpdatePostReplyHandler<T extends PostComment>(
-  type: 'comment' | 'insight', repositoryFactory: () => ReplyRepository<T>,
+  type: 'comment' | 'insight' | 'insight-comment' | 'insight-brick', repositoryFactory: () => ReplyRepository<T>,
 ): ApiProxyHandler {
   const handler: ApiProxyHandler = async event => {
     try {
@@ -40,13 +41,16 @@ export function createUpdatePostReplyHandler<T extends PostComment>(
       const author = await new GlobalMentionRepository().findByUserIdAndStatusActive(event.principalUser.id);
       if (!author?.id) return ResponseEntity.notFound();
 
-      const parent = await new PostRepository().findByUid(parentUid);
-      if (!parent?.id || parent.status !== GlobalStatus.Active || parent.workspaceId !== workspace.id) {
+      const insightReply = type === 'insight-comment' || type === 'insight-brick';
+      const parent = insightReply
+        ? await new PostInsightRepository().findByUid(parentUid)
+        : await new PostRepository().findByUid(parentUid);
+      if (!parent?.id || (insightReply ? parent.status === GlobalStatus.Deleted : parent.status !== GlobalStatus.Active) || parent.workspaceId !== workspace.id) {
         return ResponseEntity.notFound();
       }
       const repository = repositoryFactory();
       let entity = await repository.findByUid(replyUid);
-      if (!entity?.id || entity.status !== GlobalStatus.Active || entity.workspaceId !== workspace.id
+      if (!entity?.id || (type === 'insight-brick' ? entity.status === GlobalStatus.Deleted : entity.status !== GlobalStatus.Active) || entity.workspaceId !== workspace.id
         || entity.parentId !== parent.id || entity.projectId !== parent.projectId) {
         return ResponseEntity.notFound();
       }
@@ -60,7 +64,7 @@ export function createUpdatePostReplyHandler<T extends PostComment>(
       entity.markdownSource = reply.markdown;
       entity.htmlSource = reply.data.post;
       entity.updatedAt = Date.now();
-      entity.attributes = jsonString(entity.attributes || {});
+      entity.attributes = typeof entity.attributes === 'string' ? entity.attributes : jsonString(entity.attributes || {});
       entity = await repository.save(entity, true);
       await service.replaceReferences(reply, entity.id);
       return ResponseEntity.ok();
@@ -70,7 +74,9 @@ export function createUpdatePostReplyHandler<T extends PostComment>(
     }
   };
   return Middlify(handler, [
-    ProvideLoggerMiddleware(type === 'insight' ? 'UpdatePostInsightHandler' : 'UpdatePostCommentHandler'),
+    ProvideLoggerMiddleware(type === 'insight' ? 'UpdatePostInsightHandler'
+      : type === 'insight-comment' ? 'UpdateInsightCommentHandler'
+      : type === 'insight-brick' ? 'UpdateInsightBrickHandler' : 'UpdatePostCommentHandler'),
     ProvidePolicyMiddleware(),
   ]);
 }

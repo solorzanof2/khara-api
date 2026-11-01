@@ -6,6 +6,7 @@ export const Partition = {
   PostInsight: 'posts_insights',
   InsightComments: 'insights_comments',
   InsightBricks: 'insights_bricks',
+  BrickCategories: 'brick_categories',
   Tags: 'tags',
   Taggables: 'taggables',
   Users: 'users',

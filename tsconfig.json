@@ -13,7 +13,7 @@
     "esModuleInterop": true,
     "outDir": "./dist",
     "rootDir": "./src",
-    "types": ["jest"]
+    "types": ["node", "jest"]
   },
   "include": ["src/**/*.ts", "tests/**/*.test.ts"],
   "exclude": [
