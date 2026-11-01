@@ -33,6 +33,21 @@ export class GlobalMentionRepository extends Repository<GlobalMention> {
     }
   }
 
+  async findByParentIdAndParentTypeAndStatusActive(parentId: number, parentType: string): Promise<GlobalMention> {
+    try {
+      this.selectQuery
+        .equals('parentId', String(parentId)).and()
+        .equals('parentType', parentType).and()
+        .equals('status', GlobalStatus.Active)
+        .limit(1);
+      const [row] = await this.execute(this.selectQuery);
+      return useResolve(row?.id ? row : new GlobalMention());
+    }
+    catch (error) {
+      return useReject(error);
+    }
+  }
+
   async findAllByIdIn(values: number[] = []): Promise<GlobalMention[]> {
     try {
       const select = this.selectQuery;

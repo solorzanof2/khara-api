@@ -1,3 +1,4 @@
+import { load } from 'cheerio';
 import { SimpleLogger } from '../../deepcore/application/helpers/SimpleLogger';
 import { PostDataDTO } from '../contracts/datatransfers/PostDataDTO';
 import { Tag } from '../domain/Tag';
@@ -7,7 +8,7 @@ import { TagService } from './TagService';
 
 export class PostMapperService {
 
-  private readonly TagsRegexp = /([@#][\w_-]+)/gmi;
+  private readonly TagsRegexp = /(?<![\w@])[@#][\w_-]+/g;
 
   private tagService: TagService = new TagService();
 
@@ -22,47 +23,46 @@ export class PostMapperService {
 
       const model = new PostDataDTO();
       model.rawPost = value;
-
-      const tagsCollection = value.match(this.TagsRegexp);
-
-      if (!tagsCollection?.length) {
-        model.post = value;
-        return useResolve(model);
-      }
-
-      let current = '';
-      let rawText = '';
-
-      let tagModel: Tag;
-
-      for (current of tagsCollection) {
-        if (current.startsWith('@')) {
-          rawText = current.replace('@', '');
-          model.mentions.push(rawText);
-
-          tagModel = await this.tagService.getByNameAndUpdateUsage(rawText, userId);
-          value = value.replaceAll(current, tagModel.link);
-
-          model.mentionEntities.push(tagModel);
-          continue;
-        }
-
-        if (current.startsWith('#')) {
-          rawText = current.replace('#', '');
-          model.hashtags.push(rawText);
-
-          tagModel = await this.tagService.getByNameAndUpdateUsage(rawText, userId, TagService.CategoryHashtag);
-          value = value.replaceAll(current, tagModel.link);
-
-          model.hashtagEntities.push(tagModel);
-          continue;
-        }
-      }
-
-      // model.mentionsText = this.buildCommaStringFromArray(model.mentions);
-      // model.hashtagsText = this.buildCommaStringFromArray(model.hashtags);
-      model.post = value;
       model.userId = userId;
+
+      const $ = load(value, undefined, false);
+      const textNodes = $('*').add($.root()).contents().toArray().filter(node =>
+        node.type === 'text' && !$(node).parents('a, code, pre, script, style').length
+      );
+      const links = new Map<string, string>();
+      for (const node of textNodes) {
+        if (node.type !== 'text') {
+          continue;
+        }
+        for (const current of node.data.match(this.TagsRegexp) || []) {
+          if (links.has(current)) {
+            continue;
+          }
+          const rawText = current.slice(1);
+          const isMention = current.startsWith('@');
+          const tagModel: Tag = await this.tagService.getByNameAndUpdateUsage(
+            rawText, userId, isMention ? TagService.CategoryMention : TagService.CategoryHashtag
+          );
+          links.set(current, tagModel.link);
+          if (isMention) {
+            model.mentions.push(rawText);
+            model.mentionEntities.push(tagModel);
+          }
+          else {
+            model.hashtags.push(rawText);
+            model.hashtagEntities.push(tagModel);
+          }
+        }
+      }
+
+      for (const node of textNodes) {
+        if (node.type !== 'text' || !node.data.match(this.TagsRegexp)) {
+          continue;
+        }
+        const escaped = node.data.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        $(node).replaceWith(escaped.replace(this.TagsRegexp, match => links.get(match) || match));
+      }
+      model.post = $.html();
 
       return useResolve(model);
     }

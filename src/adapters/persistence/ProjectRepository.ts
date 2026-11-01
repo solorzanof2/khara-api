@@ -89,6 +89,36 @@ export class ProjectRepository extends Repository<Project> {
   }
 
 
+  async findByWorkspaceIdAndProjectKeyAndStatusNotDeleted(workspaceId: number, projectKey: string): Promise<Project> {
+    try {
+      this.selectQuery
+        .equals('workspaceId', String(workspaceId)).and()
+        .equals('projectKey', projectKey).and()
+        .notEquals('status', GlobalStatus.Deleted)
+        .limit(1);
+      const [row] = await this.execute(this.selectQuery);
+      return useResolve(row?.id ? row : new Project());
+    }
+    catch (error) {
+      return useReject(error);
+    }
+  }
+
+  async findByWorkspaceIdAndNameAndStatusNotDeleted(workspaceId: number, name: string): Promise<Project> {
+    try {
+      this.selectQuery
+        .equals('workspaceId', String(workspaceId)).and()
+        .equals('name', name).and()
+        .notEquals('status', GlobalStatus.Deleted)
+        .limit(1);
+      const [row] = await this.execute(this.selectQuery);
+      return useResolve(row?.id ? row : new Project());
+    }
+    catch (error) {
+      return useReject(error);
+    }
+  }
+
   async findByName(value: string): Promise<Project> {
     try {
       this.selectQuery

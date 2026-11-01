@@ -10,6 +10,22 @@ export class CompanyRepository extends Repository<Company> {
     super(Company);
   }
 
+  async findInternalByWorkspaceIdAndStatusNotDeleted(workspaceId: number): Promise<Company> {
+    try {
+      this.selectQuery
+        .equals('workspaceId', String(workspaceId)).and()
+        .equals('companyType', 'internal').and()
+        .notEquals('status', GlobalStatus.Deleted)
+        .orderByAsc('id')
+        .limit(1);
+      const [row] = await this.execute(this.selectQuery);
+      return useResolve(row?.id ? row : new Company());
+    }
+    catch (error) {
+      return useReject(error);
+    }
+  }
+
   async findByUid(value: string): Promise<Company> {
     try {
       this.selectQuery

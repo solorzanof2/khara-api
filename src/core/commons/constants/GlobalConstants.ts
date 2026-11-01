@@ -72,6 +72,7 @@ export const GlobalTaggableType = {
 } as const;
 
 export const GlobalParentType = {
+  Project: 'project',
   User: 'user',
   Team: 'team',
   Customer: 'customer',

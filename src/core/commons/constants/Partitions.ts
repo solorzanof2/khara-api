@@ -18,6 +18,7 @@ export const Partition = {
   RolesMenus: 'roles_menus',
   Parameters: 'parameters',
   GlobalMentions: 'global_mentions',
+  Mentions: 'mentions',
   Workspaces: 'workspaces',
   WorkspaceMembers: 'workspace_members',
   Companies: 'companies',

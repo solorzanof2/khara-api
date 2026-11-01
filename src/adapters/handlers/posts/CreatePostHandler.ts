@@ -1,4 +1,6 @@
-import { GlobalStatus, GlobalTaggableType } from '../../../core/commons/constants/GlobalConstants';
+import { GlobalStatus, GlobalTaggableType, GlobalVisibilityType } from '../../../core/commons/constants/GlobalConstants';
+import { ProjectService } from '../../../core/services/ProjectService';
+import { MentionService } from '../../../core/services/MentionService';
 import { Post } from '../../../core/domain/Post';
 import { PostMapperService } from '../../../core/services/PostMapperService';
 import { SimpleLogger } from '../../../deepcore/application/helpers/SimpleLogger';
@@ -20,7 +22,7 @@ import { jsonString } from '../../../core/helpers/functions/Json';
 interface RequestBody {
   content: string;
   workspaceUid: string;
-  projectUid: string;
+  projectUid?: string;
 }
 
 
@@ -30,18 +32,13 @@ const CreatePost: ApiProxyHandler = async (event: ApiEvent): Promise<ApiProxyRes
       content, workspaceUid, projectUid,
     } = event.body as RequestBody;
 
-    if (!content) {
+    if (typeof content !== 'string' || !content.trim()) {
       SimpleLogger.warning(`No se recibió contenido para la publicación. [400] Bad Request`, 'CreatePostHandler', event.requestId);
       return ResponseEntity.badRequest();
     }
 
     if (!workspaceUid) {
       SimpleLogger.warning(`No se recibió un UID válido para WORKSPACE. [400] Bad Request`, 'CreatePostHandler', event.requestId);
-      return ResponseEntity.badRequest();
-    }
-
-    if (!projectUid) {
-      SimpleLogger.warning(`No se recibió un UID válido para PROJECT. [400] Bad Request`, 'CreatePostHandler', event.requestId);
       return ResponseEntity.badRequest();
     }
 
@@ -67,9 +64,9 @@ const CreatePost: ApiProxyHandler = async (event: ApiEvent): Promise<ApiProxyRes
     }
 
     const projectRepository = new ProjectRepository();
-    const project = await projectRepository.findByUidAndStatusNotDeleted(projectUid);
+    const project = projectUid ? await projectRepository.findByUidAndStatusNotDeleted(projectUid) : undefined;
 
-    if (!project?.id) {
+    if (projectUid && (!project?.id || project.workspaceId !== workspace.id)) {
       SimpleLogger.warning(`No se encontró el PROJECT con el UID: ${projectUid} | workspace: ${workspaceUid}. [404] Not Found`, 'CreatePostHandler', event.requestId);
       return ResponseEntity.notFound();
     }
@@ -82,6 +79,14 @@ const CreatePost: ApiProxyHandler = async (event: ApiEvent): Promise<ApiProxyRes
     const postDataDTO = await postMapperService.parse(htmlContent, event.principalUser.id); // FIXME éste usuario debe venir del principalUser
     postDataDTO.postType = GlobalTaggableType.Post;
 
+    const mentionService = new MentionService();
+    const resolved = await mentionService.resolve(postDataDTO.mentions, {
+      workspaceId: workspace.id,
+      companyId: project?.companyId,
+      visibility: project?.visibility || GlobalVisibilityType.Internal,
+    });
+    const primaryProject = project || resolved.projects[0] || await new ProjectService().getOrCreateDefault(workspace.id);
+
     let entity = new Post();
     entity.uid = Security.getRandomGUID();
     entity.status = GlobalStatus.Active;
@@ -91,8 +96,8 @@ const CreatePost: ApiProxyHandler = async (event: ApiEvent): Promise<ApiProxyRes
     entity.updatedAt = now;
     entity.attributes = jsonString({});
     entity.workspaceId = workspace.id;
-    entity.projectId = project.id;
-    entity.visibility = project.visibility;
+    entity.projectId = primaryProject.id;
+    entity.visibility = primaryProject.visibility;
     entity.authorId = globalMention.id;
     entity.userId = event.principalUser.id;
     // entity.userId = event.principalUser.id;
@@ -105,6 +110,7 @@ const CreatePost: ApiProxyHandler = async (event: ApiEvent): Promise<ApiProxyRes
 
     const taggableService = new TaggableService();
     await taggableService.create(postDataDTO, entity.id);
+    await mentionService.create(resolved.mentions, entity.id, event.principalUser.id, GlobalTaggableType.Post);
 
     // TODO enviar aquí una notificación a los implicados;
     // TODO agregar un mapper aquí;

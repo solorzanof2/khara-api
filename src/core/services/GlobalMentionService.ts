@@ -11,7 +11,7 @@ export class GlobalMentionService {
 
   constructor() { }
 
-  async add(username: string, displayName: string[], parentId: number, parentType: string): Promise<void> {
+  async add(username: string, displayName: string[], parentId: number, parentType: string): Promise<GlobalMention> {
     try {
       const now = Date.now();
 
@@ -25,9 +25,7 @@ export class GlobalMentionService {
       model.mention = username;
       model.displayName = displayName.join(' ');
 
-      await this.globalMentionRepository.save(model);
-
-      return useResolve();
+      return useResolve(await this.globalMentionRepository.save(model, true));
     }
     catch (error) {
       return useReject(error);
