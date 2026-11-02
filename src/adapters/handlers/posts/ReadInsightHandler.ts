@@ -1,3 +1,4 @@
+import { Exception } from '../../../deepcore/application/core/Exception';
 import { GlobalStatus } from '../../../core/commons/constants/GlobalConstants';
 import { InsightResponse } from '../../../core/contracts/responses/InsightResponse';
 import { Dates } from '../../../core/helpers/DatesHelper';
@@ -17,6 +18,7 @@ import { ProjectRepository } from '../../persistence/ProjectRepository';
 import { mapInsightResponse } from './InsightResponseMapper';
 
 const ReadInsight: ApiProxyHandler = async event => {
+  const handlerName = 'ReadInsightHandler';
   try {
     const { ref } = event.queryStringParameters || {};
     if (typeof ref !== 'string' || !ref.trim()) {
@@ -24,12 +26,21 @@ const ReadInsight: ApiProxyHandler = async event => {
       return ResponseEntity.badRequest();
     }
     const insight = await new PostInsightRepository().findByUid(ref);
-    if (!insight?.id || insight.status === GlobalStatus.Deleted) return ResponseEntity.notFound();
+    if (!insight?.id || insight.status === GlobalStatus.Deleted) {
+      SimpleLogger.warning('No se encontró el insight disponible con UID: ' + ref + '. [404] Not Found', handlerName, event.requestId);
+      return ResponseEntity.notFound();
+    }
     const parent = await new PostRepository().findById(insight.parentId);
     if (!parent?.id || parent.status !== GlobalStatus.Active || parent.projectId !== insight.projectId
-      || parent.workspaceId !== insight.workspaceId) return ResponseEntity.notFound();
+      || parent.workspaceId !== insight.workspaceId) {
+      SimpleLogger.warning('No se encontró la publicación principal ' + insight.parentId + ' activa en el proyecto ' + insight.projectId + ' y workspace ' + insight.workspaceId + ' del insight ' + ref + '. [404] Not Found', handlerName, event.requestId);
+      return ResponseEntity.notFound();
+    }
     const project = await new ProjectRepository().findByIdAndStatusNotDeleted(insight.projectId);
-    if (!project?.id || project.workspaceId !== insight.workspaceId) return ResponseEntity.notFound();
+    if (!project?.id || project.workspaceId !== insight.workspaceId) {
+      SimpleLogger.warning('No se encontró el proyecto ' + insight.projectId + ' en el workspace ' + insight.workspaceId + ' del insight ' + ref + '. [404] Not Found', handlerName, event.requestId);
+      return ResponseEntity.notFound();
+    }
     const [comments, bricks] = await Promise.all([
       new PostInsightCommentRepository().findByParentId(insight.id),
       new InsightBrickRepository().findByParentId(insight.id),
@@ -52,7 +63,15 @@ const ReadInsight: ApiProxyHandler = async event => {
     };
     return ResponseEntity.ok(response);
   }
-  catch (error) { return ResponseEntity.error(error); }
+  catch (error) {
+    if (error instanceof Exception && error.code >= 400 && error.code < 500) {
+      SimpleLogger.warning('No se pudo completar la solicitud. ' + error.message + ' [' + error.code + ']', handlerName, event.requestId);
+    }
+    else {
+      SimpleLogger.error('No se pudo completar la solicitud. ' + '[' + (error instanceof Exception ? error.code : 500) + '] ' + (error instanceof Error ? error.stack || error.message : String(error)), handlerName, event.requestId);
+    }
+    return ResponseEntity.error(error);
+  }
 };
 
 export const ReadInsightHandler = Middlify(ReadInsight, [
