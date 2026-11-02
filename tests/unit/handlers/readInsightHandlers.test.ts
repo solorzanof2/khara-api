@@ -50,6 +50,21 @@ test('reads the insight and its own children with each correct author, project a
   expect(InsightBrickRepository.prototype.findByParentId).toHaveBeenCalledWith(10);
 });
 
+test('returns every brick even when only the first has populated attributes', async () => {
+  const attributes = ['{"custom":true}', '{}', '', null];
+  jest.mocked(InsightBrickRepository.prototype.findByParentId).mockResolvedValue(attributes.map((value, index) =>
+    Object.assign(new InsightBrick(), { id: index + 1, uid: 'brick-' + index, authorId: 3,
+      markdownSource: 'Brick ' + index, attributes: value })));
+
+  const response = await ReadInsightHandler(event());
+  expect(response.body.status).toBe(200);
+  expect(response.body.payload.totalBricks).toBe(4);
+  expect(response.body.payload.bricks.map((brick: { uid: string }) => brick.uid))
+    .toEqual(['brick-0', 'brick-1', 'brick-2', 'brick-3']);
+
+  const collection = await ReadInsightBricksCollectionHandler(event());
+  expect(collection.body.payload).toHaveLength(4);
+});
 test('returns empty collections and zero totals', async () => {
   jest.mocked(PostInsightCommentRepository.prototype.findByParentId).mockResolvedValue([]);
   jest.mocked(InsightBrickRepository.prototype.findByParentId).mockResolvedValue([]);

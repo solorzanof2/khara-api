@@ -18,6 +18,7 @@ export class Invitation extends Model {
 
   constructor() {
     super(Partition.Invitations);
+    this.id = 0;
   }
 
 }

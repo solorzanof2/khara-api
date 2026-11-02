@@ -21,6 +21,7 @@ export class InsightBrick extends Model {
 
   constructor() {
     super(Partition.InsightBricks);
+    this.id = 0;
   }
 
 }
