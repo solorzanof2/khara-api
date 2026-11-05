@@ -63,24 +63,12 @@ export const GlobalCategoryPost = {
   Timer: 'timer',
 } as const;
 
-export const GlobalTaggableType = {
-  Post: 'post',
-  PostComment: 'post_comment',
-  Insight: 'insight',
-  InsightComment: 'insight_comment',
-  insightBrick: 'insight_brick',
-} as const;
-
 export const GlobalParentType = {
   Project: 'project',
   User: 'user',
   Team: 'team',
   Customer: 'customer',
   Post: 'post',
-  PostComment: 'post_comment',
-  Insight: 'insight',
-  InsightComment: 'insight_comment',
-  InsightBrick: 'insight_brick',
   Client: 'client',
   Supplier: 'supplier',
   Partner: 'partner',

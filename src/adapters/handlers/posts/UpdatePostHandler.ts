@@ -8,7 +8,6 @@ import { Middlify } from '../../../deepcore/application/middlify/Middlify';
 import { PostRepository } from '../../persistence/PostRepository';
 import { ProjectRepository } from '../../persistence/ProjectRepository';
 import { PostMapperService } from '../../../core/services/PostMapperService';
-import { GlobalTaggableType } from '../../../core/commons/constants/GlobalConstants';
 import { GlobalMentionRepository } from '../../persistence/GlobalMentionRepository';
 import { WorkspaceRepository } from '../../persistence/WorkspaceRepository';
 import { TaggableService } from '../../../core/services/TaggableService';
@@ -19,13 +18,14 @@ interface RequestBody {
   workspaceUid: string;
   projectUid: string;
   postUid: string;
+  parentUid?: string;
 }
 
 
 const UpdatePost: ApiProxyHandler = async (event: ApiEvent): Promise<ApiProxyResult> => {
   try {
     const {
-      content, workspaceUid, projectUid, postUid,
+      content, workspaceUid, projectUid, postUid, parentUid,
     } = event.body as RequestBody;
 
     if (!content) {
@@ -72,7 +72,7 @@ const UpdatePost: ApiProxyHandler = async (event: ApiEvent): Promise<ApiProxyRes
     const projectRepository = new ProjectRepository();
     const project = await projectRepository.findByUidAndStatusNotDeleted(projectUid);
 
-    if (!project?.id) {
+    if (!project?.id || project.workspaceId !== workspace.id) {
       SimpleLogger.warning(`No se encontró el PROJECT con el UID: ${projectUid} | workspace: ${workspaceUid}. [404] Not Found`, 'CreatePostHandler', event.requestId);
       return ResponseEntity.notFound();
     }
@@ -81,9 +81,14 @@ const UpdatePost: ApiProxyHandler = async (event: ApiEvent): Promise<ApiProxyRes
 
     let entity = await postRepository.findByUid(postUid);
 
-    if (!entity?.id) {
-      SimpleLogger.warning(`No se encontró el POST con el UID: ${postUid} | workspace: ${workspaceUid}. [404] Not Found`, 'CreatePostHandler', event.requestId);
+    if (!entity?.id || entity.workspaceId !== workspace.id || entity.projectId !== project.id) {
+      SimpleLogger.warning(`No se encontró el POST con el UID: ${postUid} o parentUid: ${parentUid} | workspace: ${workspaceUid}. [404] Not Found`, 'CreatePostHandler', event.requestId);
       return ResponseEntity.notFound();
+    }
+
+    if (parentUid) {
+      const parent = await postRepository.findByUid(parentUid);
+      if (!parent?.id || entity.parentId !== parent.id) return ResponseEntity.notFound();
     }
 
     const now = Date.now();
@@ -92,7 +97,6 @@ const UpdatePost: ApiProxyHandler = async (event: ApiEvent): Promise<ApiProxyRes
 
     let htmlContent = mdCompiler.render(content);
     const postDataDTO = await postMapperService.parse(htmlContent, event.principalUser.id); // FIXME éste usuario debe venir del principalUser
-    postDataDTO.postType = GlobalTaggableType.Post;
 
     entity.htmlSource = postDataDTO.post;
     entity.markdownSource = content;

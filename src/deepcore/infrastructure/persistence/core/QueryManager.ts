@@ -285,7 +285,7 @@ export abstract class QueryManager<T extends Model> {
       switch (true) {
         case (this.protectedFields.includes(field)):
         case (model.relations.includes(field)):
-        case (typeof model[field as keyof Model] === 'object'):
+        case (model[field as keyof Model] !== null && typeof model[field as keyof Model] === 'object'):
           continue;
       }
 

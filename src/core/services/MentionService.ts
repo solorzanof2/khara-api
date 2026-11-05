@@ -3,7 +3,6 @@ import { GlobalMentionRepository } from '../../adapters/persistence/GlobalMentio
 import { MentionRepository } from '../../adapters/persistence/MentionRepository';
 import { ProjectRepository } from '../../adapters/persistence/ProjectRepository';
 import { UserRepository } from '../../adapters/persistence/UserRepository';
-import { Security } from '../../deepcore/application/utils/Security';
 import { GlobalParentType, GlobalVisibilityType } from '../commons/constants/GlobalConstants';
 import { GlobalMention } from '../domain/GlobalMention';
 import { Mention } from '../domain/Mention';
@@ -33,6 +32,7 @@ export class MentionService {
 
   async resolve(names: string[], context: MentionContext): Promise<ResolvedMentions> {
     const result: ResolvedMentions = { mentions: [], projects: [] };
+
     const uniqueNames = [...new Map(names.map(name => [name.toLowerCase(), name])).values()];
     if (uniqueNames.some(name => name.length > 64)) {
       throw new Error('Las menciones deben tener como máximo 64 caracteres.');
@@ -40,7 +40,10 @@ export class MentionService {
 
     let companyId = context.companyId;
     for (const name of uniqueNames) {
+      // FIXME unificar esta consulta usando un findUserByUsernameIn(uniqueNames);
+      // FIXME corregir el algoritmo para que itere sobre los User;
       const user = await this.userRepository.findUserByUsername(name);
+
       let parentId: number;
       let parentType: string;
       let displayName = name;
@@ -49,10 +52,12 @@ export class MentionService {
         parentType = GlobalParentType.User;
       }
       else {
+        // FIXME estas dos consultas son prácticamente lo mismo, la distancia entre una y otra es por un OR, el ORM lo soporta, pero creo que no funciona bien, no obstante, se puede utilizar una query nativa.
         let project = await this.projectRepository.findByWorkspaceIdAndProjectKeyAndStatusNotDeleted(context.workspaceId, name);
         if (!project?.id) {
           project = await this.projectRepository.findByWorkspaceIdAndNameAndStatusNotDeleted(context.workspaceId, name);
         }
+
         if (!project?.id) {
           if (!companyId) {
             const company = await this.companyRepository.findInternalByWorkspaceIdAndStatusNotDeleted(context.workspaceId);
@@ -78,16 +83,14 @@ export class MentionService {
     return result;
   }
 
-  async create(mentions: GlobalMention[], parentId: number, userId: number, parentType: string): Promise<void> {
+  async create(mentions: GlobalMention[], parentId: number, userId: number): Promise<void> {
     const now = Date.now();
     for (const globalMention of mentions) {
       const entity = new Mention();
-      entity.uid = Security.getRandomGUID();
       entity.createdAt = now;
       entity.updatedAt = now;
       entity.userId = userId;
       entity.parentId = parentId;
-      entity.parentType = parentType;
       entity.globalMentionId = globalMention.id;
       await this.mentionRepository.save(entity);
     }

@@ -1,40 +1,15 @@
-// import { GlobalStatus } from '../../core/commons/constants/GlobalConstants';
 import { GlobalStatus } from '../../core/commons/constants/GlobalConstants';
+import { Partition } from '../../core/commons/constants/Partitions';
 import { GlobalMention } from '../../core/domain/GlobalMention';
-import { Post } from '../../core/domain/Post';
-import { PostComment } from '../../core/domain/PostComment';
-// import { PostInsight } from '../../core/domain/PostInsight';
+import { Post, PostCount } from '../../core/domain/Post';
 import { jsonParse, jsonString } from '../../core/helpers/functions/Json';
 import { useReject, useResolve } from '../../core/helpers/functions/Promises';
 import { Repository } from '../../deepcore/infrastructure/persistence/Repository';
-
 
 export class PostRepository extends Repository<Post> {
 
   constructor() {
     super(Post);
-
-    // this.joinColumn({
-    //   property: 'file',
-    //   fieldName: 'fileId',
-    //   target: File,
-    //   updatable: false,
-    //   joinType: 'INNER',
-    // });
-
-    this.inverseJoin({
-      property: 'comments',
-      mappedBy: 'parentId',
-      target: PostComment,
-      // joinType: 'INNER',
-    });
-
-    // this.inverseJoin({
-    //   property: 'insights',
-    //   mappedBy: 'parentId',
-    //   target: PostInsight,
-    //   // joinType: 'INNER',
-    // });
 
     this.joinColumn({
       property: 'author',
@@ -97,69 +72,12 @@ export class PostRepository extends Repository<Post> {
         return useResolve(await super.save(model, getLastInserted));
       }
 
-      return useResolve();
+      return useResolve(await super.save(model));
     }
     catch (error) {
       return useReject(error);
     }
   }
-
-  // async findAllPaginated(offset: number, limit: number = 10): Promise<Post[]> {
-  //   try {
-  //     this.mapAllRelations();
-
-  //     this.selectQuery
-  //       .paginate(offset, limit)
-  //       .orderByDesc('id');
-
-  //     const rows = await this.execute(this.selectQuery);
-
-  //     if (!rows?.length) {
-  //       return Promise.resolve(new Array<Post>());
-  //     }
-
-  //     let row: Post;
-  //     for (row of rows) {
-  //       row.attachments = this.extract(row.attachments);
-  //       row.attributes = this.extract(row.attributes);
-  //       row.location = this.extract(row.location);
-  //     }
-
-  //     return Promise.resolve(rows);
-  //   }
-  //   catch (error) {
-  //     return Promise.reject(error);
-  //   }
-  // }
-
-  // async findAllPaginatedByStatusComingOrActive(offset: number, limit: number = 10): Promise<Post[]> {
-  //   try {
-  //     this.mapAllRelations();
-
-  //     this.selectQuery
-  //       .in('status', [GlobalStatus.Active, GlobalStatus.Coming])
-  //       .paginate(offset, limit)
-  //       .orderByDesc('id');
-
-  //     const rows = await this.execute(this.selectQuery);
-
-  //     if (!rows?.length) {
-  //       return Promise.resolve(new Array<Post>());
-  //     }
-
-  //     let row: Post;
-  //     for (row of rows) {
-  //       row.attachments = this.extract(row.attachments);
-  //       row.attributes = this.extract(row.attributes);
-  //       row.location = this.extract(row.location);
-  //     }
-
-  //     return Promise.resolve(rows);
-  //   }
-  //   catch (error) {
-  //     return Promise.reject(error);
-  //   }
-  // }
 
   async findAllPaginated(offset: number, limit: number = 10): Promise<Post[]> {
     try {
@@ -178,6 +96,7 @@ export class PostRepository extends Repository<Post> {
         row.attributes = jsonParse(row.attributes);
       }
 
+      await this.loadChildren(rows);
       return useResolve(rows);
     }
     catch (error) {
@@ -229,6 +148,7 @@ export class PostRepository extends Repository<Post> {
         row.attributes = jsonParse(row.attributes);
       }
 
+      await this.loadChildren(rows);
       return useResolve(rows);
     }
     catch (error) {
@@ -243,7 +163,6 @@ export class PostRepository extends Repository<Post> {
       this.selectQuery
         .equals('uid', value, 0).and()
         .equals('status', GlobalStatus.Active);
-        // .limit(1);
 
       const [row] = await this.execute(this.selectQuery);
 
@@ -252,6 +171,7 @@ export class PostRepository extends Repository<Post> {
       }
 
       row.attributes = jsonParse(row.attributes);
+      await this.loadChildren([row]);
 
       return useResolve(row);
     }
@@ -281,6 +201,7 @@ export class PostRepository extends Repository<Post> {
         row.attributes = jsonParse(row.attributes);
       }
 
+      await this.loadChildren(rows);
       return useResolve(rows);
     }
     catch (error) {
@@ -292,7 +213,7 @@ export class PostRepository extends Repository<Post> {
     try {
       const queryBuilder = [
         "SELECT COUNT(`t0`.id) AS total",
-        "FROM `posts` `t0`",
+        "FROM `" + Partition.Posts + "` `t0`",
         "WHERE `t0`.userId = ?",
         "AND `t0`.status = ?"
       ];
@@ -305,6 +226,55 @@ export class PostRepository extends Repository<Post> {
       const total = await super.countByQuery(queryBuilder.join(' '), params);
 
       return useResolve(total);
+    }
+    catch (error) {
+      return useReject(error);
+    }
+  }
+
+  // Load children separately: the generic ORM resolves relations by table name and
+  // cannot distinguish both sides of a self join. This also preserves pagination.
+  private async loadChildren(posts: Post[]): Promise<void> {
+    if (!posts.length) return;
+    const children = await this.queryBySql<Post[]>(
+      'SELECT * FROM `posts` WHERE parentId IN (' + posts.map(() => '?').join(', ') + ') AND status = ? ORDER BY id',
+      [...posts.map(post => String(post.id)), GlobalStatus.Active],
+    );
+    for (const post of posts) {
+      post.postsCollection = children.filter(child => child.parentId === post.id)
+        .map(child => Object.assign(new Post(), child, { attributes: jsonParse(child.attributes) }));
+    }
+  }
+
+  async countByParentIdIn(values: number[]): Promise<PostCount[]> {
+    try {
+      if (!values.length) return [];
+      const questionMarks = values.map(() => '?').join(', ');
+
+      const query = [
+        'SELECT `t0`.parentId, COUNT(`t0`.parentId) as total',
+        'FROM `' + Partition.Posts + '` `t0`',
+        'WHERE `t0`.parentId IN (' + questionMarks + ') AND `t0`.status = ?',
+        'GROUP BY `t0`.parentId',
+      ];
+
+      const rows = await this.queryBySql<PostCount[]>(query.join(' '), [...values.map(value => `${value}`), GlobalStatus.Active]);
+
+      if (!rows?.length) {
+        return useResolve(new Array<PostCount>());
+      }
+
+      const collection = new Array<PostCount>();
+      let row: any;
+
+      for (row of rows) {
+        collection.push({
+          parentId: row.parentId,
+          total: row.total,
+        });
+      }
+
+      return useResolve(collection);
     }
     catch (error) {
       return useReject(error);

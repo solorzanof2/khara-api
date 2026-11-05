@@ -10,10 +10,8 @@ import { ResponseEntity } from '../../../deepcore/application/http/ResponseEntit
 import { ProvideLoggerMiddleware } from '../../../deepcore/application/middlify/middleware/LoggerMiddleware';
 import { ProvidePolicyMiddleware } from '../../../deepcore/application/middlify/middleware/PolicyMiddleware';
 import { Middlify } from '../../../deepcore/application/middlify/Middlify';
-import { PostInsightRepository } from '../../persistence/PostInsightRepository';
 import { PostRepository } from '../../persistence/PostRepository';
 import { ProjectRepository } from '../../persistence/ProjectRepository';
-
 
 type PostWithProjectResponse = BasePostResponse & Pick<FullPostResponse, 'project'>;
 
@@ -53,15 +51,7 @@ const ReadPostsCollectionByUser: ApiProxyHandler = async (event: ApiEvent): Prom
 
     const collector = new Array<PostWithProjectResponse>();
     let post: Post;
-    // let insight: PostInsight;
-    // let comment: PostComment;
     let postDTO: PostWithProjectResponse;
-    // let insightDTO: any;
-    // let commentDTO: any;
-    let totalInsights: number = 0;
-
-    const insightRepository = new PostInsightRepository();
-    const totalInsightsCollection = await insightRepository.countByParentIdIn(collection.map(post => post.id));
 
     const projectRepository = new ProjectRepository();
     const projects = new Map<number, Project>();
@@ -76,7 +66,6 @@ const ReadPostsCollectionByUser: ApiProxyHandler = async (event: ApiEvent): Prom
         }
         projects.set(post.projectId, project);
       }
-      totalInsights = totalInsightsCollection.find(insight => insight.parentId === post.id)?.total ?? 0;
 
       postDTO = {
         uid: post.uid,
@@ -86,8 +75,7 @@ const ReadPostsCollectionByUser: ApiProxyHandler = async (event: ApiEvent): Prom
         createdLabel: Dates.toUserDatetime(post.createdAt),
         updated: post.updatedAt,
         updatedLabel: Dates.toUserDatetime(post.updatedAt),
-        totalComments: post.comments.length,
-        totalInsights,
+        totalChilds: post.postsCollection.length,
         project: {
           uid: project.uid,
           workspaceUid: project.workspace?.uid,
@@ -106,38 +94,8 @@ const ReadPostsCollectionByUser: ApiProxyHandler = async (event: ApiEvent): Prom
         mention: post.author.mention,
       } as PostWithProjectResponse;
 
-      // for (insight of post.insights) {
-      //   insightDTO = {
-      //     uid: insight.uid,
-      //     rawContent: insight.markdownSource,
-      //     htmlContent: insight.htmlSource,
-      //     created: insight.createdAt,
-      //     createdLabel: Dates.toUserDatetime(insight.createdAt),
-      //     updated: insight.updatedAt,
-      //     updatedLabel: Dates.toUserDatetime(insight.updatedAt),
-      //   }
-
-      //   postDTO.insights.push(insightDTO);
-      // }
-
-      // for (comment of post.comments) {
-      //   commentDTO = {
-      //     uid: comment.uid,
-      //     rawContent: comment.markdownSource,
-      //     htmlContent: comment.htmlSource,
-      //     created: comment.createdAt,
-      //     createdLabel: Dates.toUserDatetime(comment.createdAt),
-      //     updated: comment.updatedAt,
-      //     updatedLabel: Dates.toUserDatetime(comment.updatedAt),
-      //   }
-
-      //   postDTO.comments.push(commentDTO);
-      // }
-
       collector.push(postDTO);
     }
-
-    // armamos la info de paginación;
 
     response.collection = collector;
     response.length = collector.length;

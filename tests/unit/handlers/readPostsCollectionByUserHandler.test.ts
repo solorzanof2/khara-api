@@ -1,6 +1,5 @@
 import { ReadPostCollectionByUserHandler } from '../../../src/adapters/handlers/posts/ReadPostsCollectionByUserHandler';
 import { PostRepository } from '../../../src/adapters/persistence/PostRepository';
-import { PostInsightRepository } from '../../../src/adapters/persistence/PostInsightRepository';
 import { ProjectRepository } from '../../../src/adapters/persistence/ProjectRepository';
 import { Post } from '../../../src/core/domain/Post';
 import { Project } from '../../../src/core/domain/Project';
@@ -15,7 +14,7 @@ const event = (query = { page: '0', perPage: '10' }): any => ({
   queryStringParameters: query, principalUser: { id: 7 }, requestId: 'test',
 });
 const makePost = (id: number, projectId: number): Post => Object.assign(new Post(), {
-  id, uid: 'post-' + id, projectId, markdownSource: '**Original**', htmlSource: '<p><strong>Original</strong></p>',
+  id, uid: 'post-' + id, projectId, postsCollection: [new Post(), new Post()], markdownSource: '**Original**', htmlSource: '<p><strong>Original</strong></p>',
   createdAt: 1793486671624, updatedAt: 1793486671624,
   author: Object.assign(new GlobalMention(), { displayName: 'Félix', mention: 'felixo' }),
 });
@@ -29,7 +28,6 @@ describe('ReadPostCollectionByUserHandler', () => {
     jest.spyOn(PostRepository.prototype, 'findAllPaginatedByUserIdAndStatusActive').mockResolvedValue([makePost(1, 10)]);
     jest.spyOn(PostRepository.prototype, 'countByUserIdAndStatusActive').mockResolvedValue(11);
     jest.spyOn(PostRepository.prototype, 'countByProjectIdAndStatusActive').mockResolvedValue(99);
-    jest.spyOn(PostInsightRepository.prototype, 'countByParentIdIn').mockResolvedValue([{ parentId: 1, total: 2 }]);
     jest.spyOn(ProjectRepository.prototype, 'findByIdAndStatusNotDeleted').mockResolvedValue(project);
   });
   afterEach(() => jest.restoreAllMocks());
@@ -40,7 +38,7 @@ describe('ReadPostCollectionByUserHandler', () => {
     const response = result.body.payload;
     expect(response.collection[0]).toEqual(expect.objectContaining({
       uid: 'post-1', rawContent: '**Original**', htmlContent: '<p><strong>Original</strong></p>',
-      totalComments: 0, totalInsights: 2, displayName: 'Félix', mention: 'felixo',
+      totalChilds: 2, displayName: 'Félix', mention: 'felixo',
       project: {
         uid: project.uid, workspaceUid: 'workspace-1', name: 'General', key: 'general',
         visibility: project.visibility, visibilityLabel: LABEL.parse(project.visibility),

@@ -1,4 +1,0 @@
---changeset fsolorzano:ADD-INSIGHT-BRICK-CONTENT-20261101
-ALTER TABLE insights_bricks
-  ADD COLUMN markdownSource LONGTEXT NOT NULL,
-  ADD COLUMN htmlSource LONGTEXT NOT NULL;

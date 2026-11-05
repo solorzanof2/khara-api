@@ -1,8 +1,6 @@
 import { FullPostResponse } from '../../../core/contracts/responses/PostResponse';
 import { GlobalMention } from '../../../core/domain/GlobalMention';
-import { InsightComment } from '../../../core/domain/InsightComment';
-import { PostComment } from '../../../core/domain/PostComment';
-import { PostInsight } from '../../../core/domain/PostInsight';
+import { Post } from '../../../core/domain/Post';
 import { Dates } from '../../../core/helpers/DatesHelper';
 import { LABEL } from '../../../core/helpers/LabelHelper';
 import { SimpleLogger } from '../../../deepcore/application/helpers/SimpleLogger';
@@ -12,10 +10,8 @@ import { ProvideLoggerMiddleware } from '../../../deepcore/application/middlify/
 import { ProvidePolicyMiddleware } from '../../../deepcore/application/middlify/middleware/PolicyMiddleware';
 import { Middlify } from '../../../deepcore/application/middlify/Middlify';
 import { GlobalMentionRepository } from '../../persistence/GlobalMentionRepository';
-import { PostInsightRepository } from '../../persistence/PostInsightRepository';
 import { PostRepository } from '../../persistence/PostRepository';
 import { ProjectRepository } from '../../persistence/ProjectRepository';
-
 
 const ReadPost: ApiProxyHandler = async (event: ApiEvent): Promise<ApiProxyResult> => {
   try {
@@ -53,8 +49,6 @@ const ReadPost: ApiProxyHandler = async (event: ApiEvent): Promise<ApiProxyResul
       createdLabel: Dates.toUserDatetime(post.createdAt),
       updated: post.updatedAt,
       updatedLabel: Dates.toUserDatetime(post.updatedAt),
-      totalComments: post.comments.length,
-      totalInsights: 0,
       project: {
         uid: project.uid,
         workspaceUid: project.workspace?.uid,
@@ -69,18 +63,12 @@ const ReadPost: ApiProxyHandler = async (event: ApiEvent): Promise<ApiProxyResul
         updated: project.updatedAt,
         updatedLabel: Dates.millisToLocalUserDatetime(project.updatedAt),
       },
-      insights: new Array<any>(),
-      comments: new Array<any>(),
+      totalChilds: post.postsCollection.length,
+      childs: new Array<any>(),
       displayName: post.author.displayName,
       mention: post.author.mention,
     } as FullPostResponse;
 
-    let insight: PostInsight;
-    let comment: PostComment;
-    let insightComment: InsightComment;
-    let insightDTO: any;
-    let commentDTO: any;
-    let insightCommentDTO: any;
     let author: GlobalMention;
 
     const globalMentionRepository = new GlobalMentionRepository();
@@ -88,83 +76,37 @@ const ReadPost: ApiProxyHandler = async (event: ApiEvent): Promise<ApiProxyResul
     let authorsCollection = new Array<GlobalMention>();
     let authorsIdsCollection = new Array<number>();
 
-    const insightRepository = new PostInsightRepository();
-    const insightsCollection = await insightRepository.findByParentId(post.id);
-    postDTO.totalInsights = insightsCollection.length;
-
-    if (insightsCollection?.length) {
-      authorsIdsCollection = insightsCollection.map(row => row.authorId);
-    }
-
-    if (post.comments?.length) {
-      authorsIdsCollection = [
-        ...authorsIdsCollection,
-        ...post.comments.map(row => row.authorId),
-      ];
+    if (post.postsCollection?.length) {
+      authorsIdsCollection = post.postsCollection.map(row => row.authorId);
     }
 
     if (authorsIdsCollection.length) {
       authorsCollection = await globalMentionRepository.findAllByIdIn(authorsIdsCollection);
     }
 
-    for (insight of insightsCollection) {
-      author = authorsCollection.find(row => row.id === insight.authorId) as GlobalMention;
+    const childCounts = await postRepository.countByParentIdIn(post.postsCollection.map(child => child.id));
 
-      insightDTO = {
-        uid: insight.uid,
-        rawContent: insight.markdownSource,
-        htmlContent: insight.htmlSource,
-        created: insight.createdAt,
-        createdLabel: Dates.toUserDatetime(insight.createdAt),
-        updated: insight.updatedAt,
-        updatedLabel: Dates.toUserDatetime(insight.updatedAt),
-        displayName: author.displayName,
-        mention: author.mention,
-        type: 'insight',
+    let postChild: Post;
+    let postChildDTO: any;
+
+    for (postChild of post.postsCollection) {
+      author = authorsCollection.find(row => row.id === postChild.authorId) as GlobalMention;
+
+      postChildDTO = {
+        uid: postChild.uid,
+        rawContent: postChild.markdownSource,
+        htmlContent: postChild.htmlSource,
+        created: postChild.createdAt,
+        createdLabel: Dates.toUserDatetime(postChild.createdAt),
+        updated: postChild.updatedAt,
+        updatedLabel: Dates.toUserDatetime(postChild.updatedAt),
+        totalChilds: childCounts.find(row => row.parentId === postChild.id)?.total ?? 0,
+        displayName: author?.displayName ?? '',
+        mention: author?.mention ?? '',
+        type: 'post',
       }
 
-      if (insight.comments?.length) {
-        if (!insightDTO.comments?.length) {
-          insightDTO.comments = new Array<any>();
-        }
-
-        for (insightComment of insight.comments) {
-          insightCommentDTO = {
-            uid: insightComment.uid,
-            rawContent: insightComment.markdownSource,
-            htmlContent: insightComment.htmlSource,
-            created: insightComment.createdAt,
-            createdLabel: Dates.toUserDatetime(insightComment.createdAt),
-            updated: insightComment.updatedAt,
-            updatedLabel: Dates.toUserDatetime(insightComment.updatedAt),
-            displayName: author.displayName,
-            mention: author.mention,
-          }
-
-          insightDTO.comments.push(insightCommentDTO);
-        }
-      }
-
-      postDTO.insights.push(insightDTO);
-    }
-
-    for (comment of post.comments) {
-      author = authorsCollection.find(row => row.id === comment.authorId) as GlobalMention;
-
-      commentDTO = {
-        uid: comment.uid,
-        rawContent: comment.markdownSource,
-        htmlContent: comment.htmlSource,
-        created: comment.createdAt,
-        createdLabel: Dates.toUserDatetime(comment.createdAt),
-        updated: comment.updatedAt,
-        updatedLabel: Dates.toUserDatetime(comment.updatedAt),
-        displayName: author.displayName,
-        mention: author.mention,
-        type: 'comment',
-      }
-
-      postDTO.comments.push(commentDTO);
+      postDTO.childs.push(postChildDTO);
     }
 
     return ResponseEntity.ok(postDTO);
@@ -173,7 +115,6 @@ const ReadPost: ApiProxyHandler = async (event: ApiEvent): Promise<ApiProxyResul
     return ResponseEntity.error(error);
   }
 }
-
 
 export const ReadPostHandler = Middlify(ReadPost, [
   ProvideLoggerMiddleware('ReadPostHandler'),

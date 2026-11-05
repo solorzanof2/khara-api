@@ -1,12 +1,9 @@
-import { BrickAttributes } from '../Brick';
 import { ProjectResponse } from './ProjectResponse';
-
 
 export interface PostResponse {
 
   uid: string;
-  totalComments: number;
-  totalInsights: number;
+  totalChilds: number;
   fullContent: string;
   status: string;
   category: string;
@@ -15,9 +12,9 @@ export interface PostResponse {
 
 export interface BasePostResponse {
 
-  attributes?: BrickAttributes;
+  attributes?: Record<string, unknown>;
   category?: string;
-  type?: 'comment' | 'insight' | 'insight-comment' | 'insight-brick';
+  type?: 'post';
 
   uid: string;
   rawContent: string;
@@ -26,8 +23,7 @@ export interface BasePostResponse {
   created: number;
   updatedLabel: string;
   updated: number;
-  totalComments: number;
-  totalInsights: number;
+  totalChilds: number;
   displayName: string;
   mention: string;
 
@@ -36,8 +32,7 @@ export interface BasePostResponse {
 export interface FullPostResponse extends BasePostResponse {
 
   project: ProjectResponse;
-  insights: BasePostResponse[];
-  comments: BasePostResponse[];
+  childs: BasePostResponse[];
 
 }
 

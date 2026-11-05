@@ -1,4 +1,4 @@
---changeset fsolorzano:SCHEMA-20250803
+--changeset fsolorzano:KHARA-SCHEMA-20261102
 CREATE TABLE `posts` (
   `id` bigint PRIMARY KEY NOT NULL AUTO_INCREMENT,
   `uid` varchar(50) UNIQUE NOT NULL,
@@ -8,21 +8,41 @@ CREATE TABLE `posts` (
   `createdAt` bigint(20) NOT NULL,
   `updatedAt` bigint(20) NOT NULL,
   `attributes` json NOT NULL,
-  `workspaceId` bigint(20) NOT NULL,
-  `projectId` bigint(20) NOT NULL,
+  `workspaceId` bigint(20),
+  `projectId` bigint(20),
   `visibility` varchar(12) NOT NULL DEFAULT 'internal' COMMENT 'private | internal | team | restricted | public',
+  `authorId` bigint(20),
   `userId` bigint(20) NOT NULL,
-  `authorId` bigint(20) NOT NULL
+  `parentId` bigint(20) NULL
 );
 
-CREATE TABLE `mentions` (
+CREATE TABLE `post_capabilities` (
+  `id` bigint PRIMARY KEY NOT NULL AUTO_INCREMENT,
+  `uid` varchar(50) UNIQUE NOT NULL,
+  `status` varchar(50) NOT NULL DEFAULT 'active' COMMENT 'active | inactive | deleted',
+  `createdAt` bigint(20) NOT NULL,
+  `updatedAt` bigint(20) NOT NULL,
+  `attributes` json NOT NULL COMMENT 'configurations for capability',
+  `parentId` bigint(20) NOT NULL COMMENT 'FK for posts',
+  `userId` bigint(20) NOT NULL
+);
+
+CREATE TABLE `capability_records` (
   `id` bigint PRIMARY KEY NOT NULL AUTO_INCREMENT,
   `uid` varchar(50) UNIQUE NOT NULL,
   `createdAt` bigint(20) NOT NULL,
   `updatedAt` bigint(20) NOT NULL,
+  `attributes` json NOT NULL COMMENT 'capability details',
+  `parentId` bigint(20) NOT NULL COMMENT 'FK for capabilities',
+  `userId` bigint(20) NOT NULL
+);
+
+CREATE TABLE `mentions` (
+  `id` bigint PRIMARY KEY NOT NULL AUTO_INCREMENT,
+  `createdAt` bigint(20) NOT NULL,
+  `updatedAt` bigint(20) NOT NULL,
   `userId` bigint(20) NOT NULL,
-  `parentType` varchar(127) NOT NULL DEFAULT 'post' COMMENT 'post, post_comment, insight, insight_comment, insight_brick',
-  `parentId` bigint(20) NOT NULL COMMENT 'FK for parent type definition',
+  `parentId` bigint(20) NOT NULL COMMENT 'FK for posts',
   `globalMentionId` bigint(20) NOT NULL
 );
 
@@ -32,81 +52,15 @@ CREATE TABLE `global_mentions` (
   `createdAt` bigint(20) NOT NULL,
   `updatedAt` bigint(20) NOT NULL,
   `status` varchar(16) NOT NULL DEFAULT 'active' COMMENT 'active | inactive',
-  `parentType` varchar(32) NOT NULL DEFAULT 'user' COMMENT 'user | team | customer',
+  `parentType` varchar(32) NOT NULL DEFAULT 'user' COMMENT 'user | project | team | customer',
   `parentId` bigint(20) NOT NULL COMMENT 'FK for parent type definition',
-  `mention` varchar(24) NOT NULL,
-  `displayName` varchar(24) NOT NULL
-);
-
-CREATE TABLE `posts_comments` (
-  `id` bigint PRIMARY KEY NOT NULL AUTO_INCREMENT,
-  `uid` varchar(50) UNIQUE NOT NULL,
-  `status` varchar(20) NOT NULL DEFAULT 'active' COMMENT 'active | inactive | deleted',
-  `createdAt` bigint(20) NOT NULL,
-  `updatedAt` bigint(20) NOT NULL,
-  `markdownSource` longtext NOT NULL,
-  `htmlSource` longtext NOT NULL,
-  `hashtags` varchar(512),
-  `mentions` varchar(512),
-  `parentId` bigint(20),
-  `userId` bigint(20) NOT NULL,
-  `authorId` bigint(20) NOT NULL,
-  `workspaceId` bigint(20) NOT NULL,
-  `projectId` bigint(20) NOT NULL,
-  `attributes` json NOT NULL
-);
-
-CREATE TABLE `posts_insights` (
-  `id` bigint PRIMARY KEY NOT NULL AUTO_INCREMENT,
-  `uid` varchar(50) UNIQUE NOT NULL,
-  `status` varchar(20) NOT NULL DEFAULT 'pending' COMMENT 'pending | done | reported | none',
-  `createdAt` bigint(20) NOT NULL,
-  `updatedAt` bigint(20) NOT NULL,
-  `markdownSource` longtext NOT NULL,
-  `htmlSource` longtext NOT NULL,
-  `parentId` bigint(20),
-  `userId` bigint(20) NOT NULL,
-  `votes` bigint(20) NOT NULL DEFAULT '0',
-  `authorId` bigint(20) NOT NULL,
-  `workspaceId` bigint(20) NOT NULL,
-  `projectId` bigint(20) NOT NULL,
-  `attributes` json NOT NULL
-);
-
-CREATE TABLE `insights_comments` (
-  `id` bigint PRIMARY KEY NOT NULL AUTO_INCREMENT,
-  `uid` varchar(50) UNIQUE NOT NULL,
-  `status` varchar(20) NOT NULL DEFAULT 'active' COMMENT 'active | deleted',
-  `createdAt` bigint(20) NOT NULL,
-  `updatedAt` bigint(20) NOT NULL,
-  `markdownSource` longtext NOT NULL,
-  `htmlSource` longtext NOT NULL,
-  `parentId` bigint(20),
-  `userId` bigint(20) NOT NULL,
-  `authorId` bigint(20) NOT NULL,
-  `workspaceId` bigint(20) NOT NULL,
-  `projectId` bigint(20) NOT NULL,
-  `attributes` json NOT NULL
-);
-
-CREATE TABLE `insights_bricks` (
-  `id` bigint PRIMARY KEY NOT NULL AUTO_INCREMENT,
-  `uid` varchar(50) UNIQUE NOT NULL,
-  `parentId` bigint(20),
-  `category` varchar(63) NOT NULL,
-  `createdAt` bigint(20) NOT NULL,
-  `updatedAt` bigint(20) NOT NULL,
-  `attributes` json NOT NULL,
-  `status` varchar(20) NOT NULL DEFAULT 'pending' COMMENT 'pending | done | reported | none',
-  `userId` bigint(20) NOT NULL,
-  `authorId` bigint(20) NOT NULL,
-  `workspaceId` bigint(20) NOT NULL,
-  `projectId` bigint(20) NOT NULL
+  `mention` varchar(64) NOT NULL,
+  `displayName` varchar(255) NOT NULL
 );
 
 CREATE TABLE `tags` (
   `id` bigint PRIMARY KEY NOT NULL AUTO_INCREMENT,
-  `name` varchar(100) UNIQUE NOT NULL,
+  `name` varchar(128) UNIQUE NOT NULL,
   `category` varchar(20) NOT NULL DEFAULT 'mention' COMMENT 'mention, hashtag',
   `link` varchar(512) NOT NULL,
   `usageCount` bigint(20) NOT NULL DEFAULT '1',
@@ -119,10 +73,8 @@ CREATE TABLE `taggables` (
   `createdAt` bigint(20) NOT NULL,
   `updatedAt` bigint(20) NOT NULL,
   `tagId` bigint,
-  `parentType` varchar(127) NOT NULL DEFAULT 'post' COMMENT 'post, post_comment, insight, insight_comment, insight_brick',
   `parentId` bigint(20) NOT NULL,
-  `userId` bigint(20),
-  `attributes` json NOT NULL
+  `userId` bigint(20)
 );
 
 CREATE TABLE `users` (
@@ -234,7 +186,7 @@ CREATE TABLE `workspace_members` (
   `workspaceId` bigint(20),
   `personId` bigint(20),
   `uid` varchar(50) UNIQUE NOT NULL,
-  `role` varchar(64) NOT NULL DEFAULT 'internal' COMMENT 'internal | external | contractor',
+  `role` varchar(64) NOT NULL DEFAULT 'internal' COMMENT 'internal | client | contractor',
   `status` varchar(16) NOT NULL DEFAULT 'active' COMMENT 'active | inactive | deleted',
   `createdAt` bigint(20) NOT NULL,
   `updatedAt` bigint(20) NOT NULL
@@ -326,59 +278,35 @@ CREATE TABLE `project_members` (
   `updatedAt` bigint(20) NOT NULL
 );
 
-ALTER TABLE `posts` ADD FOREIGN KEY (`authorId`) REFERENCES `global_mentions` (`id`);
-
 ALTER TABLE `posts` ADD FOREIGN KEY (`workspaceId`) REFERENCES `workspaces` (`id`);
 
 ALTER TABLE `posts` ADD FOREIGN KEY (`projectId`) REFERENCES `projects` (`id`);
 
+ALTER TABLE `posts` ADD FOREIGN KEY (`authorId`) REFERENCES `global_mentions` (`id`);
+
+ALTER TABLE `posts` ADD FOREIGN KEY (`parentId`) REFERENCES `posts` (`id`);
+
+ALTER TABLE `posts` ADD FOREIGN KEY (`userId`) REFERENCES `users` (`id`);
+
+ALTER TABLE `post_capabilities` ADD FOREIGN KEY (`parentId`) REFERENCES `posts` (`id`);
+
+ALTER TABLE `post_capabilities` ADD FOREIGN KEY (`userId`) REFERENCES `users` (`id`);
+
+ALTER TABLE `capability_records` ADD FOREIGN KEY (`parentId`) REFERENCES `post_capabilities` (`id`);
+
+ALTER TABLE `capability_records` ADD FOREIGN KEY (`userId`) REFERENCES `users` (`id`);
+
 ALTER TABLE `mentions` ADD FOREIGN KEY (`userId`) REFERENCES `users` (`id`);
 
+ALTER TABLE `mentions` ADD FOREIGN KEY (`parentId`) REFERENCES `posts` (`id`);
+
 ALTER TABLE `mentions` ADD FOREIGN KEY (`globalMentionId`) REFERENCES `global_mentions` (`id`);
-
-ALTER TABLE `posts_comments` ADD FOREIGN KEY (`parentId`) REFERENCES `posts` (`id`);
-
-ALTER TABLE `posts_comments` ADD FOREIGN KEY (`userId`) REFERENCES `users` (`id`);
-
-ALTER TABLE `posts_comments` ADD FOREIGN KEY (`authorId`) REFERENCES `global_mentions` (`id`);
-
-ALTER TABLE `posts_comments` ADD FOREIGN KEY (`workspaceId`) REFERENCES `workspaces` (`id`);
-
-ALTER TABLE `posts_comments` ADD FOREIGN KEY (`projectId`) REFERENCES `projects` (`id`);
-
-ALTER TABLE `posts_insights` ADD FOREIGN KEY (`parentId`) REFERENCES `posts` (`id`);
-
-ALTER TABLE `posts_insights` ADD FOREIGN KEY (`userId`) REFERENCES `users` (`id`);
-
-ALTER TABLE `posts_insights` ADD FOREIGN KEY (`authorId`) REFERENCES `global_mentions` (`id`);
-
-ALTER TABLE `posts_insights` ADD FOREIGN KEY (`workspaceId`) REFERENCES `workspaces` (`id`);
-
-ALTER TABLE `posts_insights` ADD FOREIGN KEY (`projectId`) REFERENCES `projects` (`id`);
-
-ALTER TABLE `insights_comments` ADD FOREIGN KEY (`parentId`) REFERENCES `posts_insights` (`id`);
-
-ALTER TABLE `insights_comments` ADD FOREIGN KEY (`userId`) REFERENCES `users` (`id`);
-
-ALTER TABLE `insights_comments` ADD FOREIGN KEY (`authorId`) REFERENCES `global_mentions` (`id`);
-
-ALTER TABLE `insights_comments` ADD FOREIGN KEY (`workspaceId`) REFERENCES `workspaces` (`id`);
-
-ALTER TABLE `insights_comments` ADD FOREIGN KEY (`projectId`) REFERENCES `projects` (`id`);
-
-ALTER TABLE `insights_bricks` ADD FOREIGN KEY (`parentId`) REFERENCES `posts_insights` (`id`);
-
-ALTER TABLE `insights_bricks` ADD FOREIGN KEY (`userId`) REFERENCES `users` (`id`);
-
-ALTER TABLE `insights_bricks` ADD FOREIGN KEY (`authorId`) REFERENCES `global_mentions` (`id`);
-
-ALTER TABLE `insights_bricks` ADD FOREIGN KEY (`workspaceId`) REFERENCES `workspaces` (`id`);
-
-ALTER TABLE `insights_bricks` ADD FOREIGN KEY (`projectId`) REFERENCES `projects` (`id`);
 
 ALTER TABLE `tags` ADD FOREIGN KEY (`userId`) REFERENCES `users` (`id`);
 
 ALTER TABLE `taggables` ADD FOREIGN KEY (`tagId`) REFERENCES `tags` (`id`);
+
+ALTER TABLE `taggables` ADD FOREIGN KEY (`parentId`) REFERENCES `posts` (`id`);
 
 ALTER TABLE `taggables` ADD FOREIGN KEY (`userId`) REFERENCES `users` (`id`);
 
@@ -429,8 +357,4 @@ ALTER TABLE `projects` ADD FOREIGN KEY (`companyId`) REFERENCES `companies` (`id
 ALTER TABLE `project_members` ADD FOREIGN KEY (`projectId`) REFERENCES `projects` (`id`);
 
 ALTER TABLE `project_members` ADD FOREIGN KEY (`personId`) REFERENCES `persons` (`id`);
-
-
-
-
 

@@ -1,5 +1,5 @@
 {
-  "name": "liori-api",
+  "name": "khara-api",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.build.json",
     "prod": "pnpm run build \u0026\u0026 node dist/index.js",
     "test": "jest",
+    "test:schema": "node tests/integration/unified-posts-schema.cjs",
     "debug": "nodemon --inspect=9229 src/index.ts"
   },
   "devDependencies": {

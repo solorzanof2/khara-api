@@ -6,11 +6,24 @@ ALTER TABLE `posts`
   ADD INDEX `idx_posts_user` (`userId`),
   ADD INDEX `idx_posts_author` (`authorId`),
   ADD INDEX `idx_posts_workspace` (`workspaceId`),
-  ADD INDEX `idx_posts_project` (`projectId`);
+  ADD INDEX `idx_posts_project` (`projectId`),
+  ADD INDEX `idx_posts_parent` (`parentId`);
+
+ALTER TABLE `post_capabilities`
+  ADD INDEX `idx_capability_id` (`uid`),
+  ADD INDEX `idx_capability_status` (`status`),
+  ADD INDEX `idx_capability_created` (`createdAt`),
+  ADD INDEX `idx_capability_parent` (`parentId`),
+  ADD INDEX `idx_capability_user` (`userId`);
+
+ALTER TABLE `capability_records`
+  ADD INDEX `idx_capabilityrecord_uid` (`uid`),
+  ADD INDEX `idx_capabilityrecord_created` (`createdAt`),
+  ADD INDEX `idx_capabilityrecord_parent` (`parentId`),
+  ADD INDEX `idx_capabilityrecord_user` (`userId`);
 
 ALTER TABLE `mentions`
   ADD INDEX `idx_mentions_user` (`userId`),
-  ADD INDEX `idx_mentions_uid` (`uid`),
   ADD INDEX `idx_mentions_created` (`createdAt`),
   ADD INDEX `idx_mentions_parent` (`parentId`),
   ADD INDEX `idx_mentions_mention` (`globalMentionId`);
@@ -22,47 +35,6 @@ ALTER TABLE `global_mentions`
   ADD INDEX `idx_mentions_parent` (`parentId`),
   ADD INDEX `idx_mentions_mention` (`mention`);
 
-ALTER TABLE `posts_comments`
-  ADD INDEX `idx_posts_comments_uid` (`uid`),
-  ADD INDEX `idx_posts_comments_status` (`status`),
-  ADD INDEX `idx_posts_comments_created` (`createdAt`),
-  ADD INDEX `idx_posts_comments_parent` (`parentId`),
-  ADD INDEX `idx_posts_comments_user` (`userId`),
-  ADD INDEX `idx_posts_comments_author` (`authorId`),
-  ADD INDEX `idx_posts_comments_workspace` (`workspaceId`),
-  ADD INDEX `idx_posts_comments_project` (`projectId`);
-
-ALTER TABLE `posts_insights`
-  ADD INDEX `idx_insights_uid` (`uid`),
-  ADD INDEX `idx_insights_status` (`status`),
-  ADD INDEX `idx_insights_created` (`createdAt`),
-  ADD INDEX `idx_insights_parent` (`parentId`),
-  ADD INDEX `idx_insights_user` (`userId`),
-  ADD INDEX `idx_insights_votes` (`votes`),
-  ADD INDEX `idx_insights_author` (`authorId`),
-  ADD INDEX `idx_insights_workspace` (`workspaceId`),
-  ADD INDEX `idx_insights_project` (`projectId`);
-
-ALTER TABLE `insights_comments`
-  ADD INDEX `idx_insights_comments_uid` (`uid`),
-  ADD INDEX `idx_insights_comments_status` (`status`),
-  ADD INDEX `idx_insights_comments_created` (`createdAt`),
-  ADD INDEX `idx_insights_comments_parent` (`parentId`),
-  ADD INDEX `idx_insights_comments_user` (`userId`),
-  ADD INDEX `idx_insights_comments_author` (`authorId`),
-  ADD INDEX `idx_insights_comments_workspace` (`workspaceId`),
-  ADD INDEX `idx_insights_comments_project` (`projectId`);
-
-ALTER TABLE `insights_bricks`
-  ADD INDEX `idx_insights_bricks_uid` (`uid`),
-  ADD INDEX `idx_insights_bricks_status` (`status`),
-  ADD INDEX `idx_insights_bricks_created` (`createdAt`),
-  ADD INDEX `idx_insights_bricks_parent` (`parentId`),
-  ADD INDEX `idx_insights_bricks_user` (`userId`),
-  ADD INDEX `idx_insights_bricks_comments_author` (`authorId`),
-  ADD INDEX `idx_insights_bricks_comments_workspace` (`workspaceId`),
-  ADD INDEX `idx_insights_bricks_comments_project` (`projectId`);
-
 ALTER TABLE `tags`
   ADD INDEX `idx_tags_name` (`name`),
   ADD INDEX `idx_tags_usage` (`usageCount`),
@@ -71,7 +43,7 @@ ALTER TABLE `tags`
 ALTER TABLE `taggables`
   ADD INDEX `idx_taggables_uid` (`uid`),
   ADD INDEX `idx_taggables_created` (`createdAt`),
-  ADD INDEX `idx_taggables_type_id` (`parentType`, `parentId`),
+  ADD INDEX `idx_taggables_parent` (`parentId`),
   ADD INDEX `idx_taggables_tag` (`tagId`),
   ADD INDEX `idx_taggables_user` (`userId`);
 

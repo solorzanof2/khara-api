@@ -9,6 +9,7 @@ import { TaggableService } from '../../../src/core/services/TaggableService';
 import { PostMapperService } from '../../../src/core/services/PostMapperService';
 import { PostDataDTO } from '../../../src/core/contracts/datatransfers/PostDataDTO';
 import { Workspace } from '../../../src/core/domain/Workspace';
+import { Post } from '../../../src/core/domain/Post';
 import { Project } from '../../../src/core/domain/Project';
 import { GlobalMention } from '../../../src/core/domain/GlobalMention';
 
@@ -30,6 +31,22 @@ describe('CreatePostHandler', () => {
   });
   afterEach(() => jest.restoreAllMocks());
 
+  test('crea un hijo como Post y hereda el proyecto del padre', async () => {
+    jest.spyOn(PostRepository.prototype, 'findByUid').mockResolvedValue(Object.assign(new Post(), { id: 42, workspaceId: 5, projectId: 10 }));
+    jest.spyOn(ProjectRepository.prototype, 'findByIdAndStatusNotDeleted').mockResolvedValue(Object.assign(new Project(), { id: 10, workspaceId: 5, visibility: 'private' }));
+    const response = await CreatePostHandler(event({ content: 'Respuesta', workspaceUid: 'workspace', parentUid: 'parent' }));
+    expect(response.body.status).toBe(200);
+    expect(PostRepository.prototype.save).toHaveBeenCalledWith(expect.objectContaining({ parentId: 42, projectId: 10, workspaceId: 5 }), true);
+    expect(ProjectService.prototype.getOrCreateDefault).not.toHaveBeenCalled();
+  });
+
+  test.each([{ id: 0 }, { id: 42, workspaceId: 99 }, { id: 42, workspaceId: 5, projectId: 99 }, { id: 42, workspaceId: 5, projectId: 10, status: 'deleted' }])('rechaza un padre inválido: %p', async parent => {
+    jest.spyOn(PostRepository.prototype, 'findByUid').mockResolvedValue(Object.assign(new Post(), parent));
+    const response = await CreatePostHandler(event({ content: 'Respuesta', workspaceUid: 'workspace', projectUid: 'project', parentUid: 'parent' }));
+    expect(response.body.status).toBe(404);
+    expect(PostRepository.prototype.save).not.toHaveBeenCalled();
+  });
+
   test('guarda desde Home sin projectUid y usa General', async () => {
     const response = await CreatePostHandler(event({ content: 'Hola', workspaceUid: 'workspace' }));
     expect(response.body.status).toBe(200);
@@ -42,7 +59,7 @@ describe('CreatePostHandler', () => {
     jest.mocked(MentionService.prototype.resolve).mockResolvedValue({ mentions, projects: [Object.assign(new Project(), { id: 21, visibility: 'private' }), Object.assign(new Project(), { id: 22 })] });
     await CreatePostHandler(event({ content: '@uno @dos', workspaceUid: 'workspace' }));
     expect(PostRepository.prototype.save).toHaveBeenCalledWith(expect.objectContaining({ projectId: 21, visibility: 'private' }), true);
-    expect(MentionService.prototype.create).toHaveBeenCalledWith(mentions, 100, 7, 'post');
+    expect(MentionService.prototype.create).toHaveBeenCalledWith(mentions, 100, 7);
     expect(ProjectService.prototype.getOrCreateDefault).not.toHaveBeenCalled();
   });
 

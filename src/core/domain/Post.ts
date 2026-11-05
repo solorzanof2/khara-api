@@ -2,9 +2,6 @@ import { Model } from '../../deepcore/infrastructure/persistence/models/Model';
 import { GlobalStatus, GlobalVisibilityType } from '../commons/constants/GlobalConstants';
 import { Partition } from '../commons/constants/Partitions';
 import { GlobalMention } from './GlobalMention';
-import { PostComment } from './PostComment';
-import { PostInsight } from './PostInsight';
-
 
 export class Post extends Model {
 
@@ -20,15 +17,22 @@ export class Post extends Model {
   visibility: string = GlobalVisibilityType.Internal;
   userId: number = 0;
   authorId: number = 0;
+  parentId: number | null = null;
 
-  comments: PostComment[] = new Array<PostComment>();
-  insights: PostInsight[] = new Array<PostInsight>();
+  postsCollection: Post[] = new Array<Post>();
   author: GlobalMention = new GlobalMention();
 
   constructor() {
     super(Partition.Posts);
     this.id = 0;
   }
+
+}
+
+export interface PostCount {
+
+  parentId: number;
+  total: number;
 
 }
 

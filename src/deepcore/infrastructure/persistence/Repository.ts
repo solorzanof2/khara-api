@@ -82,7 +82,7 @@ export class Repository<T extends Model> extends QueryManager<T> {
             continue;
           }
 
-          query.set(field, `${model[field as keyof Model]}`);
+          query.set(field, model[field as keyof Model] === null ? null : `${model[field as keyof Model]}`);
         }
 
         query.equals(QueryManager.ColumnID, `${model.id}`);

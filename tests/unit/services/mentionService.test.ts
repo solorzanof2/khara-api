@@ -62,10 +62,10 @@ describe('MentionService', () => {
   test('una mención repetida crea una sola asociación', async () => {
     const service = new MentionService();
     const result = await service.resolve(['khara', 'Khara', 'khara'], context);
-    await service.create(result.mentions, 100, 7, 'post');
+    await service.create(result.mentions, 100, 7);
     expect(ProjectService.prototype.add).toHaveBeenCalledTimes(1);
     expect(MentionRepository.prototype.save).toHaveBeenCalledTimes(1);
-    expect(MentionRepository.prototype.save).toHaveBeenCalledWith(expect.objectContaining({ parentId: 100, userId: 7, parentType: 'post', globalMentionId: 50 }));
+    expect(MentionRepository.prototype.save).toHaveBeenCalledWith(expect.objectContaining({ parentId: 100, userId: 7, globalMentionId: 50 }));
   });
 
   test('reutiliza la referencia global existente', async () => {

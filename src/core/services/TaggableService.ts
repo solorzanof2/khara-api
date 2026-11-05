@@ -5,7 +5,6 @@ import { Tag } from '../domain/Tag';
 import { Taggable } from '../domain/Taggable';
 import { useReject } from '../helpers/functions/Promises';
 
-
 export class TaggableService {
 
   private taggableRepository: TaggableRepository = new TaggableRepository();
@@ -24,7 +23,6 @@ export class TaggableService {
         entity.createdAt = now;
         entity.updatedAt = now;
         entity.tagId = tag.id;
-        entity.parentType = postDataDTO.postType;
         entity.parentId = parentId;
         entity.userId = postDataDTO.userId;
 
@@ -39,7 +37,6 @@ export class TaggableService {
         entity.createdAt = now;
         entity.updatedAt = now;
         entity.tagId = tag.id;
-        entity.parentType = postDataDTO.postType;
         entity.parentId = parentId;
         entity.userId = postDataDTO.userId;
 

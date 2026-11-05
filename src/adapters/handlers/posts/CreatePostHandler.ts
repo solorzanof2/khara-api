@@ -1,4 +1,4 @@
-import { GlobalStatus, GlobalTaggableType, GlobalVisibilityType } from '../../../core/commons/constants/GlobalConstants';
+import { GlobalStatus, GlobalVisibilityType } from '../../../core/commons/constants/GlobalConstants';
 import { ProjectService } from '../../../core/services/ProjectService';
 import { MentionService } from '../../../core/services/MentionService';
 import { Post } from '../../../core/domain/Post';
@@ -18,18 +18,17 @@ import { ProjectRepository } from '../../persistence/ProjectRepository';
 import { WorkspaceRepository } from '../../persistence/WorkspaceRepository';
 import { jsonString } from '../../../core/helpers/functions/Json';
 
-
 interface RequestBody {
   content: string;
   workspaceUid: string;
   projectUid?: string;
+  parentUid?: string;
 }
-
 
 const CreatePost: ApiProxyHandler = async (event: ApiEvent): Promise<ApiProxyResult> => {
   try {
     const {
-      content, workspaceUid, projectUid,
+      content, workspaceUid, projectUid, parentUid,
     } = event.body as RequestBody;
 
     if (typeof content !== 'string' || !content.trim()) {
@@ -41,11 +40,6 @@ const CreatePost: ApiProxyHandler = async (event: ApiEvent): Promise<ApiProxyRes
       SimpleLogger.warning(`No se recibió un UID válido para WORKSPACE. [400] Bad Request`, 'CreatePostHandler', event.requestId);
       return ResponseEntity.badRequest();
     }
-
-    // if (!visibility || !useIsValidGlobalVisibilityType(visibility)) {
-    //   SimpleLogger.warning(`No se recibió una VISIBILITY de proyecto válida.`, 'CreatePostHandler', event.requestId);
-    //   return ResponseEntity.badRequest();
-    // }
 
     const workspaceRepository = new WorkspaceRepository();
     const workspace = await workspaceRepository.findByUidAndStatusNotDeleted(workspaceUid);
@@ -71,13 +65,28 @@ const CreatePost: ApiProxyHandler = async (event: ApiEvent): Promise<ApiProxyRes
       return ResponseEntity.notFound();
     }
 
+    const postRepository = new PostRepository();
+
+    let entity = new Post();
+
+    let parent: Post | undefined;
+    if (parentUid) {
+      parent = await postRepository.findByUid(parentUid);
+
+      if (!parent?.id || parent.status !== GlobalStatus.Active || parent.workspaceId !== workspace.id || (project && parent.projectId !== project.id)) {
+        SimpleLogger.warning(`No se encontró el Post PADRE con el UID: ${parentUid}- [404] Not Found`, 'CreatePostHandler', event.requestId);
+        return ResponseEntity.notFound();
+      }
+
+      entity.parentId = parent.id;
+    }
+
     const now = Date.now();
     const mdCompiler = markdownit();
     const postMapperService = new PostMapperService();
 
     let htmlContent = mdCompiler.render(content);
     const postDataDTO = await postMapperService.parse(htmlContent, event.principalUser.id); // FIXME éste usuario debe venir del principalUser
-    postDataDTO.postType = GlobalTaggableType.Post;
 
     const mentionService = new MentionService();
     const resolved = await mentionService.resolve(postDataDTO.mentions, {
@@ -85,9 +94,12 @@ const CreatePost: ApiProxyHandler = async (event: ApiEvent): Promise<ApiProxyRes
       companyId: project?.companyId,
       visibility: project?.visibility || GlobalVisibilityType.Internal,
     });
-    const primaryProject = project || resolved.projects[0] || await new ProjectService().getOrCreateDefault(workspace.id);
+    const primaryProject = project || (parent ? await projectRepository.findByIdAndStatusNotDeleted(parent.projectId) : undefined)
+      || resolved.projects[0] || await new ProjectService().getOrCreateDefault(workspace.id);
+    if (!primaryProject?.id || (parent && primaryProject.id !== parent.projectId)) {
+      return ResponseEntity.notFound();
+    }
 
-    let entity = new Post();
     entity.uid = Security.getRandomGUID();
     entity.status = GlobalStatus.Active;
     entity.htmlSource = postDataDTO.post;
@@ -100,20 +112,12 @@ const CreatePost: ApiProxyHandler = async (event: ApiEvent): Promise<ApiProxyRes
     entity.visibility = primaryProject.visibility;
     entity.authorId = globalMention.id;
     entity.userId = event.principalUser.id;
-    // entity.userId = event.principalUser.id;
-    // entity.htmlSource = mdCompiler.render(postDataDTO.post);
-    // entity.hashtags = postDataDTO.hashtagsText;
-    // entity.mentions = postDataDTO.mentionsText;
 
-    const postRepository = new PostRepository();
     entity = await postRepository.save(entity, true);
 
     const taggableService = new TaggableService();
     await taggableService.create(postDataDTO, entity.id);
-    await mentionService.create(resolved.mentions, entity.id, event.principalUser.id, GlobalTaggableType.Post);
-
-    // TODO enviar aquí una notificación a los implicados;
-    // TODO agregar un mapper aquí;
+    await mentionService.create(resolved.mentions, entity.id, event.principalUser.id);
 
     return ResponseEntity.ok(entity);
   }
