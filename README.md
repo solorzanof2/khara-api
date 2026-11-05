@@ -1,4 +1,4 @@
-# AUCTION PLATFORM - NODEJS
+# KHARA PLATFORM - NODEJS
 
 ![](https://img.shields.io/badge/VERSION-0.0.1-green)
 ![](https://img.shields.io/badge/NodeJS-20.11.1-blue)
@@ -99,5 +99,9 @@ tests/
 
 - Félix E. Solórzano [@solorzanof2](https://github.com/solorzanof2)
 
+
+## Docker
+
+Ver [construcción y ejecución de la imagen de la API](docs/docker.md).
 
 ## License

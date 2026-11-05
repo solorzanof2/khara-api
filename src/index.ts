@@ -8,7 +8,8 @@ import { BootManager } from './deepcore/boot/Manager';
     await bootManager.runAll();
   }
   catch (error) {
-    console.log(`[FATAL-ERR0] INDEX > ${error.message}`);
+    console.error(`[FATAL-ERR0] INDEX > `, error);
+    process.exit(1);
   }
 })();
 
